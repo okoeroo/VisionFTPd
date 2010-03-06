@@ -54,9 +54,11 @@ run: $(BIN)
 kill:
 	killall `basename $(BIN)`
 
-$(BIN): $(OBJS)
+$(BIN): $(OBJS) dirs
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $(OBJS) $(LFLAGS)
 
+dirs:
+	mkdir -p bin/ lib/
 
 # $(OBJS): 
 .c.o:
