@@ -41,10 +41,17 @@ int main (int argc, char * argv[])
     }
 
     /* vfs_main */
-    /* vfs_main ("/tmp/"); */
+    if (0 != pthread_create (&vfs_thread, NULL, vfs_main, (void *) ("/tmp/")))
+    {
+        scar_log (1, "Failed to start FTP Commander thread. Out of memory\n");
+        return 1;
+    }
+
 
     /* startSlave(); */
     pthread_join (cmd_thread, NULL);
+    pthread_join (vfs_thread, NULL);
+
 
     /* Easy exit */
     scar_log_close();
