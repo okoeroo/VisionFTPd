@@ -21,6 +21,7 @@ CPPFLAGS = \
 	-Iinclude/ \
 	-Isrc/network/ \
 	-Isrc/cmdftpd/ \
+	-Isrc/vfs/ \
 	-I. \
 
 LFLAGS = -lssl -lcrypto
@@ -42,6 +43,7 @@ OBJS  = \
 	src/cmdftpd/ftpd.o \
 	src/cmdftpd/commander.o \
 	src/irandom.o \
+	src/vfs/vfs.o \
 	src/main.o
 
 

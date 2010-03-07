@@ -8,6 +8,18 @@ typedef struct filehash_s {
     time_t timeofhash;
 } filehash_t;
 
+
+typedef enum acl_rule_type_e {
+    POSIX
+} acl_rule_type_t;
+
+/* VFS ACL */
+typedef struct vfs_acl_s {
+    mode_t st_mode;
+    acl_rule_type_t rule_types;
+} acl_t;
+
+
 /* Transport URL - many per site/cluster, but one per file on host per protocol */
 typedef struct turl_s {
     char *          protocol;
@@ -35,10 +47,10 @@ typedef struct surl_s {
 
 /* Globally Unique Identifier */
 typedef struct file_guid_s {
-    long       guid;
-    surl_t *   surls;
-    filehash_t filehash;
-    acl_t *    acls;
+    long         guid;
+    surl_t *     surls;
+    filehash_t * filehash;
+    acl_t *      acls;
 } file_guid_t;
 
 /* Logical File Name */
@@ -49,14 +61,15 @@ typedef struct lfn_s {
 
 /* Virtual File System - file types */
 typedef enum vfs_node_e {
-    VFS_DIRECTORY;
-    VFS_FILE;
-} vfsnode_t;
+    VFS_DIRECTORY,
+    VFS_FILE,
+    VFS_SYMLINK,
+} vfs_node_t;
 
 /* Virtual File System - directory struture */
 typedef struct vfs_s {
     lfn_t *          lfn;
-    vfsnode_t        node_type;
+    vfs_node_t       node_type;
     struct vfs_s *   list;
 } vfs_t;
 

@@ -217,15 +217,20 @@ int commander_state_initiator (void ** state)
 /* TODO: I need a state liberator! */
 
 /* Main daemon start for the commander */
-int startCommander (int port, int max_clients, char * ftp_banner)
+/* int startCommander (int port, int max_clients, char * ftp_banner) */
+void * startCommander (void * arg)
 {
-    set_ftp_service_banner(ftp_banner);
-    return threadingDaemonStart (port, 
-                                 max_clients, 
-                                 4096, 
-                                 4096, 
-                                 commander_active_io, 
-                                 commander_idle_io,
-                                 commander_state_initiator,
-                                 commander_state_liberator);
+    commander_options_t * commander_options = *(commander_options_t **) arg;
+
+    set_ftp_service_banner(commander_options -> ftp_banner);
+
+    threadingDaemonStart (commander_options -> port, 
+                          commander_options -> max_clients, 
+                          4096, 
+                          4096, 
+                          commander_active_io, 
+                          commander_idle_io,
+                          commander_state_initiator,
+                          commander_state_liberator);
+    return NULL;
 }
