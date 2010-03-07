@@ -13,9 +13,6 @@
 #include "ftpd.h"
 
 
-int commander_active_io (buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state, void ** state);
-int commander_idle_io   (buffer_state_t * write_buffer_state, void ** state);
-int commander_state_liberator (void ** state);
 
 
 /****************************************************************************************************
@@ -103,6 +100,9 @@ int commander_active_io (buffer_state_t * read_buffer_state, buffer_state_t * wr
     if ((rc = handle_ftp_LPRT (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
         goto finalize_message_handling;
 
+    /* Handle PORT message */
+    if ((rc = handle_ftp_PORT (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
+        goto finalize_message_handling;
 
     /* Don't know what to do - list as Idle */
     /* rc = NET_RC_IDLE; */
@@ -147,7 +147,8 @@ finalize_message_handling:
 
 int commander_state_liberator (void ** state)
 {
-    ftp_state_t * ftp_state = *(ftp_state_t **)state;
+    ftp_state_t *     ftp_state  = *(ftp_state_t **)state;
+    file_transfer_t * helper     = NULL;
     
     if (ftp_state)
     {
@@ -170,9 +171,10 @@ int commander_state_liberator (void ** state)
             ftp_state -> in_transfer -> data_address = NULL;
             ftp_state -> in_transfer -> data_port = 0;
 
+            helper = ftp_state -> in_transfer;
             ftp_state -> in_transfer = ftp_state -> in_transfer -> next;
+            free(helper);
         }
-        file_transfer_t * in_transfer;
     }
     return 0;
 }
@@ -205,19 +207,7 @@ int commander_state_initiator (void ** state)
         free(ftp_state -> cwd);
         ftp_state -> cwd        = NULL;
 
-        while (ftp_state -> in_transfer)
-        {
-            ftp_state -> in_transfer -> size = 0;
-            free(ftp_state -> in_transfer -> path);
-            ftp_state -> in_transfer -> path = NULL;
-            ftp_state -> in_transfer -> data_address_family = '\0';
-            free(ftp_state -> in_transfer -> data_address);
-            ftp_state -> in_transfer -> data_address = NULL;
-            ftp_state -> in_transfer -> data_port = 0;
-
-            ftp_state -> in_transfer = ftp_state -> in_transfer -> next;
-        }
-        file_transfer_t * in_transfer;
+        ftp_state -> in_transfer = NULL;
     }
     return 0;
 }

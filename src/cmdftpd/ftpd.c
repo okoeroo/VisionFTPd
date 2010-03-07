@@ -10,6 +10,7 @@
 
 static char * ftp_service_banner = NULL;
 
+int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft);
 
 /****************************************************************************************************
 
@@ -408,28 +409,56 @@ int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft)
 {
     int i = 0;
 
-    int  len = 0;
-    int plen = 0;
 
-    char * str       = long_host_port;
-    char * str_short = NULL;
+    unsigned char * str       = long_host_port;
+
+    /* struct sockaddr_storage ss; */
 
     unsigned char   address_family = 0;
     unsigned short  len_address    = 0;
     unsigned char * address        = NULL;
     unsigned short  len_port       = 0;
-    unsigned short  port           = NULL;
+    unsigned short  port           = 0;
+    unsigned char   port_s[2];
 
+    address_family = (unsigned char) strtol((char *) str, (char **) &str, 10);
 
-    address_family = (char) strtol(str, &str, 10);
     str = &str[1];
+    if (str[0] == '\0')
+        return 1;
 
-    strtol(str, NULL, 10);
+    len_address = (unsigned short) strtol((char *)str, (char **)&str, 10);
+    address = calloc (sizeof (unsigned char), len_address + 1);
 
-    for (i = 0; str[0] != '\0'; i++)
+    for (i = 0; i < len_address; i++)
     {
-        str = &str[i];
+        str = &str[1];
+        if (str[0] == '\0')
+            return 1;
+
+        address[i] = str[0];
     }
+
+    str = &str[1];
+    len_port = (unsigned char) strtol((char *) str, (char **) &str, 10);
+    if (len_port != 2)
+        return 1;
+
+    bzero (port_s, 2);
+
+    for (i = 0; i < 2; i++)
+    {
+        str = &str[1];
+        if (str[0] == '\0')
+            return 1;
+
+        port_s[i] = str[0];
+    }
+
+    port = (unsigned short) *port_s;
+
+    scar_log (1, "Ok, this is what I made of this: addr_fam %d, len_address %d, address %s, len_port %d, port %d\n", (int) address_family, len_address, address, len_port, port);
+
     return 0;
 }
 
@@ -449,6 +478,47 @@ int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         long_host_port = malloc (sizeof (char) * 256);
         if (sscanf ((char *) read_buffer_state -> buffer, 
                     "LPRT %255s*s", 
+                    long_host_port) <= 0)
+        {
+            /* No match */
+            free(long_host_port);
+            return NET_RC_UNHANDLED;
+        }
+        else
+        {
+            parse_long_host_port (long_host_port, &ft);
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
+            if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+            {
+                /* Buffer overrun */
+                free(long_host_port);
+                return NET_RC_DISCONNECT;
+            }
+            else
+            {
+                free(long_host_port);
+                return NET_RC_MUST_WRITE;
+            }
+        }
+    }
+}
+
+int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
+{
+    const char * cmd_trigger       = "PORT";
+    unsigned char * long_host_port = NULL;
+    file_transfer_t * ft           = NULL;
+
+    if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger, strlen (cmd_trigger)) != 0)
+    {
+        /* No match */
+        return NET_RC_UNHANDLED;
+    }
+    else
+    {
+        long_host_port = malloc (sizeof (char) * 256);
+        if (sscanf ((char *) read_buffer_state -> buffer, 
+                    "PORT %255s*s", 
                     long_host_port) <= 0)
         {
             /* No match */
