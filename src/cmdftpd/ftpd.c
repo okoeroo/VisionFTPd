@@ -10,7 +10,6 @@
 
 static char * ftp_service_banner = NULL;
 
-int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft);
 
 /****************************************************************************************************
 
@@ -38,6 +37,134 @@ char * get_ftp_service_banner (void)
 }
 
 
+int move_bytes_commited_to_next_command (buffer_state_t * read_buffer_state)
+{
+    unsigned char * bufp  = NULL;
+    unsigned char * bufpp = NULL;
+
+    /* Sanity check */
+    if (read_buffer_state -> bytes_commited > read_buffer_state -> buffer_size)
+        return 1;
+
+    bufp = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
+    bufpp = (unsigned char *) strstr((char *) bufp, CRLF);
+
+    /* Bail out when no CRLF was found */
+    if (bufpp == NULL)
+        return 1;
+
+    /* Move the pointer beyond the CRLF */
+    bufpp = &bufpp[strlen(CRLF)];
+
+    if (bufpp == NULL)
+    {
+        read_buffer_state -> bytes_commited = 0;
+        return 0;
+    }
+    else
+    {
+        read_buffer_state -> bytes_commited += strlen((char *) bufp) - strlen((char *) bufpp);
+        return 0;
+    }
+}
+
+int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft)
+{
+    int i = 0;
+
+
+    unsigned char * str       = long_host_port;
+
+    /* struct sockaddr_storage ss; */
+
+    unsigned char   address_family = 0;
+    unsigned short  len_address    = 0;
+    unsigned char * address        = NULL;
+    unsigned short  len_port       = 0;
+    unsigned short  port           = 0;
+    unsigned char   port_s[2];
+
+    address_family = (unsigned char) strtol((char *) str, (char **) &str, 10);
+
+    str = &str[1];
+    if (str[0] == '\0')
+        return 1;
+
+    len_address = (unsigned short) strtol((char *)str, (char **)&str, 10);
+    address = calloc (sizeof (unsigned char), len_address + 1);
+
+    for (i = 0; i < len_address; i++)
+    {
+        str = &str[1];
+        if (str[0] == '\0')
+            return 1;
+
+        address[i] = str[0];
+    }
+
+    str = &str[1];
+    len_port = (unsigned char) strtol((char *) str, (char **) &str, 10);
+    if (len_port != 2)
+        return 1;
+
+    bzero (port_s, 2);
+
+    for (i = 0; i < 2; i++)
+    {
+        str = &str[1];
+        if (str[0] == '\0')
+            break;
+
+        port_s[i] = str[0];
+    }
+
+    port = (unsigned short) *port_s;
+
+    scar_log (1, "Ok, this is what I made of this: addr_fam %d, len_address %d, address %s, len_port %d, port %d\n", (int) address_family, len_address, address, len_port, port);
+
+    return 0;
+}
+
+int parse_short_host_port (unsigned char * short_host_port, file_transfer_t ** ft)
+{
+    int i = 0;
+
+    unsigned char * str       = short_host_port;
+
+    /* struct sockaddr_storage ss; */
+
+    unsigned char * address        = NULL;
+    unsigned short  port           = 0;
+    unsigned char   port_s[2];
+
+    address = calloc (sizeof (unsigned char), 4 + 1);
+
+    /* IPv4 only */
+    for (i = 0; i < 4; i++)
+    {
+        str = &str[1];
+        if (str[0] == '\0')
+            return 1;
+
+        address[i] = str[0];
+    }
+
+    bzero (port_s, 2);
+    for (i = 0; i < 2; i++)
+    {
+        str = &str[1];
+        if (str[0] == '\0')
+            return 1;
+
+        port_s[i] = str[0];
+    }
+
+    port = (unsigned short) *port_s;
+
+    scar_log (1, "Ok, this is what I made of this: address %s, port %d\n", address, port);
+
+    return 0;
+}
 
 int handle_ftp_initialization (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
@@ -298,18 +425,24 @@ int handle_ftp_QUIT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
 }
 
+
 int handle_ftp_TYPE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
-    const char * cmd_trigger     = "TYPE";
-    const char * cmd_trigger_bin = "TYPE I";
-    const char * cmd_trigger_asc = "TYPE A";
+    const char *     cmd_trigger     = "TYPE";
+    const char *     cmd_trigger_bin = "TYPE I";
+    const char *     cmd_trigger_asc = "TYPE A";
+    unsigned char *  bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
 
-    if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger, strlen (cmd_trigger)) == 0)
+    if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) == 0)
     {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         /* It's a TYPE command */
-        if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger_bin, strlen (cmd_trigger_bin)) == 0)
+        if (strncasecmp ((char *) bufp, cmd_trigger_bin, strlen (cmd_trigger_bin)) == 0)
         {
             ftp_state -> mode = BINARY;
+
 
             write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200 OK Set to Binary mode\r\n");
             if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
@@ -322,7 +455,7 @@ int handle_ftp_TYPE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                 return NET_RC_MUST_WRITE;
             }
         }
-        else if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger_asc, strlen (cmd_trigger_asc)) == 0)
+        else if (strncasecmp ((char *) bufp, cmd_trigger_asc, strlen (cmd_trigger_asc)) == 0)
         {
             ftp_state -> mode = ASCII;
 
@@ -359,10 +492,11 @@ int handle_ftp_TYPE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 
 int handle_ftp_SIZE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
-    const char * cmd_trigger = "SIZE";
-    char *       path = NULL;
+    const char *        cmd_trigger     = "SIZE";
+    char *              path            = NULL;
+    unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
 
-    if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger, strlen (cmd_trigger)) != 0)
+    if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
         /* No match */
         return NET_RC_UNHANDLED;
@@ -370,7 +504,7 @@ int handle_ftp_SIZE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     else
     {
         path = malloc(sizeof(char) * PATH_MAX);
-        if (sscanf ((char *) read_buffer_state -> buffer, "SIZE %4095s*s", path) <= 0)
+        if (sscanf ((char *) bufp, "SIZE %4095s*s", path) <= 0)
         {
             /* No match */
             free(path);
@@ -378,6 +512,9 @@ int handle_ftp_SIZE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         }
         else
         {
+            /* Move commited bytes to next command in the buffer (if there) */
+            move_bytes_commited_to_next_command (read_buffer_state);
+
             /* TODO: Single transfer support for the moment! */
             if (ftp_state -> in_transfer)
             {
@@ -405,70 +542,15 @@ int handle_ftp_SIZE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 }
 
 
-int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft)
-{
-    int i = 0;
-
-
-    unsigned char * str       = long_host_port;
-
-    /* struct sockaddr_storage ss; */
-
-    unsigned char   address_family = 0;
-    unsigned short  len_address    = 0;
-    unsigned char * address        = NULL;
-    unsigned short  len_port       = 0;
-    unsigned short  port           = 0;
-    unsigned char   port_s[2];
-
-    address_family = (unsigned char) strtol((char *) str, (char **) &str, 10);
-
-    str = &str[1];
-    if (str[0] == '\0')
-        return 1;
-
-    len_address = (unsigned short) strtol((char *)str, (char **)&str, 10);
-    address = calloc (sizeof (unsigned char), len_address + 1);
-
-    for (i = 0; i < len_address; i++)
-    {
-        str = &str[1];
-        if (str[0] == '\0')
-            return 1;
-
-        address[i] = str[0];
-    }
-
-    str = &str[1];
-    len_port = (unsigned char) strtol((char *) str, (char **) &str, 10);
-    if (len_port != 2)
-        return 1;
-
-    bzero (port_s, 2);
-
-    for (i = 0; i < 2; i++)
-    {
-        str = &str[1];
-        if (str[0] == '\0')
-            return 1;
-
-        port_s[i] = str[0];
-    }
-
-    port = (unsigned short) *port_s;
-
-    scar_log (1, "Ok, this is what I made of this: addr_fam %d, len_address %d, address %s, len_port %d, port %d\n", (int) address_family, len_address, address, len_port, port);
-
-    return 0;
-}
 
 int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
-    const char * cmd_trigger       = "LPRT";
-    unsigned char * long_host_port = NULL;
-    file_transfer_t * ft           = NULL;
+    const char *        cmd_trigger     = "LPRT";
+    unsigned char *     long_host_port  = NULL;
+    file_transfer_t *   ft              = NULL;
+    unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
 
-    if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger, strlen (cmd_trigger)) != 0)
+    if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
         /* No match */
         return NET_RC_UNHANDLED;
@@ -476,7 +558,7 @@ int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     else
     {
         long_host_port = malloc (sizeof (char) * 256);
-        if (sscanf ((char *) read_buffer_state -> buffer, 
+        if (sscanf ((char *) bufp,
                     "LPRT %255s*s", 
                     long_host_port) <= 0)
         {
@@ -486,6 +568,9 @@ int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         }
         else
         {
+            /* Move commited bytes to next command in the buffer (if there) */
+            move_bytes_commited_to_next_command (read_buffer_state);
+
             parse_long_host_port (long_host_port, &ft);
             write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
             if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
@@ -505,39 +590,43 @@ int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 
 int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
-    const char * cmd_trigger       = "PORT";
-    unsigned char * long_host_port = NULL;
-    file_transfer_t * ft           = NULL;
+    const char *      cmd_trigger       = "PORT";
+    unsigned char *   short_host_port   = NULL;
+    file_transfer_t * ft                = NULL;
+    unsigned char *   bufp              = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
 
-    if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger, strlen (cmd_trigger)) != 0)
+    if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
         /* No match */
         return NET_RC_UNHANDLED;
     }
     else
     {
-        long_host_port = malloc (sizeof (char) * 256);
-        if (sscanf ((char *) read_buffer_state -> buffer, 
+        short_host_port = malloc (sizeof (char) * 256);
+        if (sscanf ((char *) bufp,
                     "PORT %255s*s", 
-                    long_host_port) <= 0)
+                    short_host_port) <= 0)
         {
             /* No match */
-            free(long_host_port);
+            free(short_host_port);
             return NET_RC_UNHANDLED;
         }
         else
         {
-            parse_long_host_port (long_host_port, &ft);
+            /* Move commited bytes to next command in the buffer (if there) */
+            move_bytes_commited_to_next_command (read_buffer_state);
+
+            parse_short_host_port (short_host_port, &ft);
             write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
             if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
             {
                 /* Buffer overrun */
-                free(long_host_port);
+                free(short_host_port);
                 return NET_RC_DISCONNECT;
             }
             else
             {
-                free(long_host_port);
+                free(short_host_port);
                 return NET_RC_MUST_WRITE;
             }
         }

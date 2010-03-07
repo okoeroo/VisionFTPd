@@ -104,8 +104,10 @@ int commander_active_io (buffer_state_t * read_buffer_state, buffer_state_t * wr
     if ((rc = handle_ftp_PORT (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
         goto finalize_message_handling;
 
-    /* Don't know what to do - list as Idle */
-    /* rc = NET_RC_IDLE; */
+    /* Handle NOOP message */
+    if ((rc = handle_ftp_NOOP (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
+        goto finalize_message_handling;
+
 
     /* 500 - Syntax error, command unrecognized. */
     if ((rc = handle_message_not_understood (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
@@ -224,6 +226,6 @@ int startCommander (int port, int max_clients, char * ftp_banner)
                                  4096, 
                                  commander_active_io, 
                                  commander_idle_io,
-                                 NULL,
+                                 commander_state_initiator,
                                  commander_state_liberator);
 }

@@ -20,6 +20,9 @@
     #define FTPD_H
 
 
+#define CRLF "\r\n"
+
+
 typedef enum ftp_mode_e {
     ASCII,
     BINARY
@@ -52,9 +55,9 @@ typedef struct ftp_state_s {
 char * get_ftp_service_banner (void);
 void set_ftp_service_banner (char *);
 
-int handle_ftp_syst (char * msg);
-int handle_ftp_feat (char * msg);
-int handle_ftp_pwd (char * msg);
+int move_bytes_commited_to_next_command (buffer_state_t * read_buffer_state);
+int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft);
+int parse_short_host_port (unsigned char * short_host_port, file_transfer_t ** ft);
 
 int handle_ftp_initialization (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state);
 int handle_message_not_understood (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state);

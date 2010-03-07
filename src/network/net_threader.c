@@ -53,10 +53,11 @@ void * threadingDaemonClientHandler (void * arg)
     struct timeval          timeout;
     int                     n  = 0;
     int                     rc = 0;
-    int                     net_thread_state   = NET_RC_CONNECTED;
-    void *                  read_return_state  = NULL;
-    buffer_state_t *        read_buffer_state  = NULL;
-    buffer_state_t *        write_buffer_state = NULL;
+    int                     net_thread_state     = NET_RC_CONNECTED;
+    void *                  read_return_state    = NULL;
+    buffer_state_t *        read_buffer_state    = NULL;
+    buffer_state_t *        write_buffer_state   = NULL;
+    size_t                  read_offset_commited = 0;
 
     /* Allocate buffers - for writing */
     write_buffer_state = init_buffer_state (net_thread_pool_node -> net_thread_parameters.write_byte_size);
@@ -107,6 +108,8 @@ void * threadingDaemonClientHandler (void * arg)
             /* n_bytes = read (client_socket, buffer, net_thread_pool_node -> net_thread_parameters.read_byte_size); */
             bzero (read_buffer_state -> buffer, read_buffer_state -> buffer_size);
             read_buffer_state -> num_bytes = read (client_socket, read_buffer_state -> buffer, read_buffer_state -> buffer_size);
+            read_buffer_state -> bytes_commited = 0;
+
             if (read_buffer_state -> num_bytes <= 0)
             {
                 /* Maybe not... */
@@ -129,37 +132,54 @@ void * threadingDaemonClientHandler (void * arg)
                 }
                 else
                 {
-                    /* Fire up read function */
-                    net_thread_state = (* net_thread_pool_node -> net_thread_parameters.net_thread_active_io_func)(read_buffer_state, write_buffer_state, &read_return_state);
-                    if (net_thread_state == NET_RC_DISCONNECT)
+                    /* Record placement of offset until where the input buffer was handled
+                     *
+                     * If this is changed, then the message has used this feature to indicate multi-message parsing support 
+                     * Setting it to 0 means that everything is handled. Leaving it as is will indicate the same, but tells that it was not used.
+                     * Changing the bytes_commited will tell where the message parsing left off and needs to require re-entry.
+                     * If bytes_commited is equal or exceeds the num_bytes, then the process stops and the message is concidered to be done
+                     */
+                    do
                     {
-                        scar_log (1, "Connection with host \"%s\" closed.\n", net_thread_pool_node -> net_thread_parameters.hostname);
-                        goto net_disconnect;
-                    }
-                    else if (net_thread_state == NET_RC_MUST_WRITE)
-                    {
-                        /* Writing - write until amount of commited bytes is equal to the number of bytes in the buffer */
-                        while (write_buffer_state -> bytes_commited < write_buffer_state -> num_bytes)
+                        /* record currently commited bytes */
+                        read_offset_commited = read_buffer_state -> bytes_commited;
+
+                        /* Fire up read function */
+                        net_thread_state = (* net_thread_pool_node -> net_thread_parameters.net_thread_active_io_func)(read_buffer_state, write_buffer_state, &read_return_state);
+                        if (net_thread_state == NET_RC_DISCONNECT)
                         {
-                            scar_log (1, "%d: >> %s", client_socket, write_buffer_state -> buffer);
-                            rc = write (client_socket, write_buffer_state -> buffer, write_buffer_state -> num_bytes);
-                            if (rc < 0)
-                            {
-                                /* Something is wrong */
-                                scar_log (1, "Error in write: \"%s\". Connection with host \"%s\" closed.\n", strerror(errno), net_thread_pool_node -> net_thread_parameters.hostname);
-                                goto net_disconnect;
-                            }
-                            else
-                            {
-                                /* Write was ok, register amount of commited Bytes */
-                                write_buffer_state -> bytes_commited += rc;
-                            }
+                            scar_log (1, "Connection with host \"%s\" closed.\n", net_thread_pool_node -> net_thread_parameters.hostname);
+                            goto net_disconnect;
                         }
-                        /* Done writing */
-                        write_buffer_state -> bytes_commited = 0;
-                        bzero (write_buffer_state -> buffer, write_buffer_state -> buffer_size);
-                        write_buffer_state -> num_bytes = 0;
+                        else if (net_thread_state == NET_RC_MUST_WRITE)
+                        {
+                            /* Writing - write until amount of commited bytes is equal to the number of bytes in the buffer */
+                            while (write_buffer_state -> bytes_commited < write_buffer_state -> num_bytes)
+                            {
+                                scar_log (1, "%d: >> %s", client_socket, write_buffer_state -> buffer);
+                                rc = write (client_socket, write_buffer_state -> buffer, write_buffer_state -> num_bytes);
+                                if (rc < 0)
+                                {
+                                    /* Something is wrong */
+                                    scar_log (1, "Error in write: \"%s\". Connection with host \"%s\" closed.\n", strerror(errno), net_thread_pool_node -> net_thread_parameters.hostname);
+                                    goto net_disconnect;
+                                }
+                                else
+                                {
+                                    /* Write was ok, register amount of commited Bytes */
+                                    write_buffer_state -> bytes_commited += rc;
+                                }
+                            }
+                            /* Done writing */
+                            write_buffer_state -> bytes_commited = 0;
+                            bzero (write_buffer_state -> buffer, write_buffer_state -> buffer_size);
+                            write_buffer_state -> num_bytes = 0;
+                        }
                     }
+                    /* Check if the reparsing feature has been used and if the conditions are met based on the bytes_commited */
+                    while ((read_offset_commited != read_buffer_state -> bytes_commited) && 
+                           (read_buffer_state -> bytes_commited < read_buffer_state -> num_bytes) &&
+                           (read_buffer_state -> bytes_commited != 0));
                 }
             }
         }
