@@ -56,9 +56,6 @@ int walkTheDir (char * newrootdir)
         {
             scar_log (1, "figure out that \"%s\" is a regular file\n", dp -> d_name);
         }
-
-
-
     }
 
     (void)closedir(dirp);
