@@ -81,7 +81,7 @@ void * threadingDaemonClientHandler (void * arg)
     /* Initiate state handle */
     if (net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func != 0)
     {
-         (* net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func)(&read_return_state);
+         (* net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func)(&read_return_state, net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg);
     }
 
     scar_log (1, "Acceptence of the client connection was Perfect! - %d - awaiting info\n", client_socket); 
@@ -248,7 +248,8 @@ int threadingDaemonStart (const int listening_port,
                           int write_chunk_size,
                           int (* net_thread_active_io_func)(buffer_state_t *, buffer_state_t *, void **),
                           int (* net_thread_idle_io_func)(buffer_state_t *, void **),
-                          int (* net_thread_state_initiator_func)(void **),
+                          int (* net_thread_state_initiator_func)(void **, void *),
+                          void * net_thread_state_initiator_arg,
                           int (* net_thread_state_liberator_func)(void **))
 {
     int                         active_thread_counter = 0;
@@ -306,6 +307,7 @@ int threadingDaemonStart (const int listening_port,
         net_thread_pool_node -> net_thread_parameters.net_thread_active_io_func           = net_thread_active_io_func;
         net_thread_pool_node -> net_thread_parameters.net_thread_idle_io_func             = net_thread_idle_io_func;
         net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func     = net_thread_state_initiator_func;
+        net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg      = net_thread_state_initiator_arg;
         net_thread_pool_node -> net_thread_parameters.net_thread_state_liberator_func     = net_thread_state_liberator_func; 
 
         scar_log (1, "Got connection from: %s\n", remote_host);

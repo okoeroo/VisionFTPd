@@ -30,7 +30,8 @@ typedef struct net_threader_parameters_s {
     char * hostname;
     int (* net_thread_active_io_func)(buffer_state_t *, buffer_state_t *, void **);
     int (* net_thread_idle_io_func)(buffer_state_t *, void **);
-    int (* net_thread_state_initiator_func)(void **);
+    int (* net_thread_state_initiator_func)(void **, void *);
+    void * net_thread_state_initiator_arg;
     int (* net_thread_state_liberator_func)(void **);
 } net_threader_parameters_t;
 
@@ -48,7 +49,9 @@ int threadingDaemonStart (const int listening_port,
                           int write_chunk_size,
                           int (* net_thread_active_io_func)(buffer_state_t *, buffer_state_t *, void **),
                           int (* net_thread_idle_io_func)(buffer_state_t *, void **),
-                          int (* net_thread_state_initiator_func)(void **),
+                          int (* net_thread_state_initiator_func)(void **, void *),
+                          void * net_thread_state_initiator_arg,
+
                           int (* net_thread_state_liberator_func)(void **));
 
 int liberate_net_thread_pool_node (net_thread_pool_t * net_thread_pool_node, int close_the_fd);

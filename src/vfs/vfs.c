@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include "vfs.h"
 
 
@@ -120,8 +121,6 @@ void * vfs_main (void * arg)
 
     walkTheDir (rootpath, rootpath, &(vfs_root -> in_dir));
 
-    VFS_print (vfs_root);
-
-    return 0;
+    pthread_exit((void *) vfs_root);
 }
 

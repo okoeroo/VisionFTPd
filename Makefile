@@ -31,6 +31,8 @@ SYS = -s
 MAH = -m
 
 BIN   =  ./bin/visionftpd
+#CHROOT = /tmp/
+CHROOT = /Users/okoeroo/dvl/clib/
 
 OBJS  = \
 	src/logging/scar_log.o \
@@ -52,7 +54,7 @@ all: $(BIN)
 
 
 run: $(BIN)
-	$(BIN); echo $$?
+	$(BIN) --chroot $(CHROOT); echo $$?
 
 kill:
 	killall `basename $(BIN)`

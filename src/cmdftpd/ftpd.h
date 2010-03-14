@@ -14,6 +14,7 @@
 
 #include "main.h"
 #include "net_threader.h"
+#include "vfs.h"
 
 
 #ifndef FTPD_H
@@ -47,7 +48,7 @@ typedef struct ftp_state_s {
     unsigned char * cwd;
 
     file_transfer_t * in_transfer;
-
+    vfs_t *vfs_root;
 } ftp_state_t;
 
 

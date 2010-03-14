@@ -10,6 +10,7 @@
 #include "net_threader.h"
 #include "unsigned_string.h"
 
+#include "vfs.h"
 
 #ifndef COMMANDER_H
     #define COMMANDER_H
@@ -19,12 +20,13 @@ typedef struct commander_options_s {
     unsigned short port;
     unsigned int   max_clients;
     char * ftp_banner;
+    vfs_t * vfs_root;
 } commander_options_t;
 
 
 int commander_active_io (buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state, void ** state);
 int commander_idle_io   (buffer_state_t * write_buffer_state, void ** state);
-int commander_state_initiator (void ** state);
+int commander_state_initiator (void ** state, void * vfs);
 int commander_state_liberator (void ** state);
 
 /* int startCommander (int port, int max_clients, char * ftp_banner); */

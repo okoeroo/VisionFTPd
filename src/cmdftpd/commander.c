@@ -12,7 +12,7 @@
 
 #include "ftpd.h"
 
-
+#include "vfs.h"
 
 
 /****************************************************************************************************
@@ -177,11 +177,13 @@ int commander_state_liberator (void ** state)
             ftp_state -> in_transfer = ftp_state -> in_transfer -> next;
             free(helper);
         }
+
+        ftp_state -> vfs_root = NULL;
     }
     return 0;
 }
 
-int commander_state_initiator (void ** state)
+int commander_state_initiator (void ** state, void * vfs)
 {
     ftp_state_t * ftp_state = *(ftp_state_t **)state;
 
@@ -210,6 +212,11 @@ int commander_state_initiator (void ** state)
         ftp_state -> cwd        = NULL;
 
         ftp_state -> in_transfer = NULL;
+
+        ftp_state -> vfs_root    = (vfs_t *) vfs;
+
+        /* DEBUG */
+        VFS_print (ftp_state -> vfs_root);
     }
     return 0;
 }
@@ -231,6 +238,7 @@ void * startCommander (void * arg)
                           commander_active_io, 
                           commander_idle_io,
                           commander_state_initiator,
+                          commander_options -> vfs_root,
                           commander_state_liberator);
     return NULL;
 }

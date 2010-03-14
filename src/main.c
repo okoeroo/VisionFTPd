@@ -18,8 +18,10 @@ int main (int argc, char * argv[])
     pthread_t             vfs_thread;
     pthread_t             cmd_thread;
     commander_options_t * commander_options;
-    /* char *                vision_chroot = "/tmp/"; */
-    char *                vision_chroot = "/Users/okoeroo/dvl/clib/visionftpd/";
+    char *                vision_chroot = NULL;
+    int                   i = 0;
+
+    vfs_t *               vfs_root = NULL;
 
     pthread_attr_t        attr;
     size_t                stacksize             = 0;
@@ -27,6 +29,30 @@ int main (int argc, char * argv[])
 
     scar_set_log_line_prefix ("VisionFTPd");
     scar_log_open (NULL, NULL, DO_ERRLOG);
+
+    
+    for (i = 1; i < argc; i++)
+    {
+        if (strcasecmp(argv[i], "--chroot") == 0)
+        {
+            if ((i + 1) < argc)
+            {
+                vision_chroot = argv[i + 1];
+            }
+            else
+            {
+                scar_log (1, "Failed to supply --chroot <dir> option\n");
+                return 1;
+            }
+        }
+    }
+
+    if (!vision_chroot)
+    {
+        scar_log (1, "Failed to supply --chroot <dir> option\n");
+        return 1;
+    }
+
 
     pthread_attr_init(&attr);
     pthread_attr_getstacksize (&attr, &stacksize);
@@ -37,6 +63,24 @@ int main (int argc, char * argv[])
     pthread_attr_setstacksize (&attr, stacksize);
 
     
+    /* vfs_main */
+    if (0 != pthread_create (&vfs_thread, &attr, vfs_main, (void *) (vision_chroot)))
+    {
+        scar_log (1, "Failed to start VFS index thread. Out of memory\n");
+        return 1;
+    }
+    pthread_join (vfs_thread, (void **) &vfs_root);
+    if (vfs_root == NULL)
+    {
+        scar_log (1, "Error: no VFS available\n");
+        return 1;
+    }
+    else
+    {
+        scar_log (1, "The Virtual File System\n");
+        /* VFS_print (vfs_root); */
+    }
+
 
     /* Start Commander */
     commander_options = calloc (1, sizeof (commander_options_t));
@@ -46,6 +90,7 @@ int main (int argc, char * argv[])
     commander_options -> port        = 6621;
     commander_options -> max_clients = 100;
     commander_options -> ftp_banner  = "VisionFTPd v0.1";
+    commander_options -> vfs_root    = vfs_root;
 
     /* Fire up the commander */
     if (0 != pthread_create (&cmd_thread, NULL, startCommander, (void *)(&commander_options)))
@@ -54,17 +99,8 @@ int main (int argc, char * argv[])
         return 1;
     }
 
-    /* vfs_main */
-    if (0 != pthread_create (&vfs_thread, &attr, vfs_main, (void *) (vision_chroot)))
-    {
-        scar_log (1, "Failed to start FTP Commander thread. Out of memory\n");
-        return 1;
-    }
-
-
-    /* startSlave(); */
+    /* Wait for commander thread join */
     pthread_join (cmd_thread, NULL);
-    pthread_join (vfs_thread, NULL);
 
 
     /* Easy exit */
