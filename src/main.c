@@ -18,9 +18,22 @@ int main (int argc, char * argv[])
     pthread_t             vfs_thread;
     pthread_t             cmd_thread;
     commander_options_t * commander_options;
+    char *                vision_chroot = "/Users/okoeroo/dvl/clib/";
+
+    pthread_attr_t        attr;
+    size_t                stacksize             = 0;
+
 
     scar_set_log_line_prefix ("VisionFTPd");
     scar_log_open (NULL, NULL, DO_ERRLOG);
+
+    pthread_attr_init(&attr);
+    pthread_attr_getstacksize (&attr, &stacksize);
+    scar_log (1, "Default stack size = %li\n", stacksize);
+    stacksize = sizeof(double)*1000000+1000000;
+
+    scar_log (1, "Amount of stack needed per thread = %li\n",stacksize);
+    pthread_attr_setstacksize (&attr, stacksize);
 
     
 
@@ -41,7 +54,7 @@ int main (int argc, char * argv[])
     }
 
     /* vfs_main */
-    if (0 != pthread_create (&vfs_thread, NULL, vfs_main, (void *) ("/tmp/")))
+    if (0 != pthread_create (&vfs_thread, &attr, vfs_main, (void *) (vision_chroot)))
     {
         scar_log (1, "Failed to start FTP Commander thread. Out of memory\n");
         return 1;

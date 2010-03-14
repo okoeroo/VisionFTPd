@@ -9,6 +9,13 @@ typedef struct filehash_s {
 } filehash_t;
 
 
+/* List of File Hashes */
+typedef struct filehash_list_s {
+    filehash_t filehash;
+    struct filehash_list_s * next;
+} filehash_list_t;
+
+
 typedef enum acl_rule_type_e {
     POSIX
 } acl_rule_type_t;
@@ -20,57 +27,69 @@ typedef struct vfs_acl_s {
 } acl_t;
 
 
+/* (Access) Protocol specifications */
+typedef struct protocol_s {
+    char * protocol_name;  /* Name of a (supported) protocol */
+    int    is_active;      /* When 0 this means it's not active and must be reached directly
+                            * When !0 this means it's actively connecting to a client. */
+    unsigned char * hostname;  /* Hostname or IP to connect to, only needed in non-active mode */
+    unsigned short port;       /* Port number to connect to */
+} protocol_t;
+
+
 /* Transport URL - many per site/cluster, but one per file on host per protocol */
 typedef struct turl_s {
-    char *          protocol;
-    char *          host;
-    char *          filesystem;
-    char *          path;
-    long            size;
-    time_t          ctime;
-    time_t          atime;
-    time_t          mtime;
-    filehash_t      filehash;
-    int             use_counter;
-    struct turl_s * next;
+    protocol_t      protocol;    /* Specifies access protocol details for this file */
+    char *          path;        /* Path to the file, relative to the data-mover chroot-ed root */
+    filehash_t *    filehash;    /* The current hash value of this file */
+    int             use_counter; /* This is to keep track of the usage of this file. Needed for hot-file counter */
+    mode_t          mode;        /* protection */
+    uid_t           uid;         /* user ID of owner */
+    gid_t           gid;         /* group ID of owner */
+    off_t           size;        /* total size, in bytes */
+    blksize_t       blksize;     /* blocksize for filesystem I/O */
+    blkcnt_t        blocks;      /* number of blocks allocated */
+    time_t          atime;       /* time of last access */
+    time_t          mtime;       /* time of last modification */
+    time_t          ctime;       /* time of last status change */
 } turl_t;
 
-/* Storage URL - 1 per site/cluster */
+
+/* List of Transport URLs - This is the highest structure pushed from a Data-Mover to a Commander */
+typedef struct turl_list_s {
+    turl_t turl;
+    struct turl_list_s *next;
+} turl_list_t;
+
+
+/* Storage URL - 1 file can be accesible at multiple TURLs */
 typedef struct surl_s {
-    int             local_replica_count;
-    turl_t *        turls;
-    char *          host;
-    int             port;
-    struct surl_s * next;
-    int             use_counter;
+    nlink_t           nlink;         /* Number of available TURL links */
+    turl_list_t *     turl_list;     /* List of TURLs to access a file from a Data-Mover */
+    int               use_counter;   /* Usage counter to signal hot files */
+    filehash_list_t * filehash_list; /* Cluster wide file hashes */
+    acl_t *           acls;
 } surl_t;
 
-/* Globally Unique Identifier */
-typedef struct file_guid_s {
-    long         guid;
-    surl_t *     surls;
-    filehash_t * filehash;
-    acl_t *      acls;
-} file_guid_t;
-
-/* Logical File Name */
-typedef struct lfn_s {
-    char *        name;
-    file_guid_t * file_guid;
-} lfn_t;
 
 /* Virtual File System - file types */
 typedef enum vfs_node_e {
     VFS_DIRECTORY,
-    VFS_FILE,
+    VFS_REGULAR_FILE,
     VFS_SYMLINK,
 } vfs_node_t;
 
+
 /* Virtual File System - directory struture */
 typedef struct vfs_s {
-    lfn_t *          lfn;
-    vfs_node_t       node_type;
-    struct vfs_s *   list;
+    vfs_node_t       node_type;   /* What type of VFS record does this describe */
+    char *           name;        /* Logical (File) Name in the VFS */
+    surl_t        *  surl;        /* The Storage URL - Only used for vfs_node_t VFS_REGULAR_FILE */
+    struct vfs_s *   child_nodes; /* For a
+                                   *  VFS_REGULAR_FILE : NULL
+                                   *  VFS_DIRECTORY    : list of directory entries
+                                   *  VFS_SYMLINK      : pointer to vfs_t to which is symbolises
+                                   */
 } vfs_t;
 
 

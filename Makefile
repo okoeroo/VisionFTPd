@@ -43,6 +43,7 @@ OBJS  = \
 	src/cmdftpd/ftpd.o \
 	src/cmdftpd/commander.o \
 	src/irandom.o \
+	src/vfs/vfs_func.o \
 	src/vfs/vfs.o \
 	src/main.o
 
