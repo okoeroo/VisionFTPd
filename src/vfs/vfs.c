@@ -1,7 +1,7 @@
 #include "vfs.h"
 
 
-int walkTheDir (char * newrootdir, char * chrootdir, vfs_t * vfs_parent)
+int walkTheDir (char * newrootdir, char * chrootdir, vfs_t ** vfs_parent)
 {
     DIR * dirp         = NULL;
     struct dirent * dp = NULL;
@@ -79,8 +79,8 @@ int walkTheDir (char * newrootdir, char * chrootdir, vfs_t * vfs_parent)
             else
             {
                 /* Adding current VFS node to tree */
-                VFS_add_child_to_parent (vfs_parent, vfs_node);
-                walkTheDir (buffer, chrootdir, vfs_node);
+                VFS_add_sibling_to_directory (vfs_parent, vfs_node);
+                walkTheDir (buffer, chrootdir, &(vfs_node -> in_dir));
             }
         }
 
@@ -94,14 +94,13 @@ int walkTheDir (char * newrootdir, char * chrootdir, vfs_t * vfs_parent)
             else
             {
                 /* Adding current VFS node to tree */
-                VFS_add_child_to_parent (vfs_parent, vfs_node);
+                VFS_add_sibling_to_directory (vfs_parent, vfs_node);
             }
         }
 
         /* Free the buffer */
         free(buffer);
     }
-
 
     /* Clean up */
     (void)closedir(dirp);
@@ -116,11 +115,10 @@ void * vfs_main (void * arg)
 {
     char * rootpath = (char *) arg;
     vfs_t * vfs_root = NULL;
-    vfs_t * node     = NULL;
 
     vfs_root = VFS_create_dir ("/");
 
-    walkTheDir (rootpath, rootpath, vfs_root);
+    walkTheDir (rootpath, rootpath, &(vfs_root -> in_dir));
 
     VFS_print (vfs_root);
 

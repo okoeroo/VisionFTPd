@@ -85,11 +85,9 @@ typedef struct vfs_s {
     vfs_node_t       node_type;   /* What type of VFS record does this describe */
     char *           name;        /* Logical (File) Name in the VFS */
     surl_t        *  surl;        /* The Storage URL - Only used for vfs_node_t VFS_REGULAR_FILE */
-    struct vfs_s *   child_nodes; /* For a
-                                   *  VFS_REGULAR_FILE : NULL
-                                   *  VFS_DIRECTORY    : list of directory entries
-                                   *  VFS_SYMLINK      : pointer to vfs_t to which is symbolises
-                                   */
+    struct vfs_s  *  dir_list;    /* Next VFS node in directory */
+    struct vfs_s  *  in_dir;      /* First entry in the directory */
+    struct vfs_s  *  symlink;     /* Symlink to other VFS node */
 } vfs_t;
 
 

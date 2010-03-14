@@ -18,8 +18,8 @@ int main (int argc, char * argv[])
     pthread_t             vfs_thread;
     pthread_t             cmd_thread;
     commander_options_t * commander_options;
-    /* char *                vision_chroot = "/Users/okoeroo/dvl/clib/"; */
-    char *                vision_chroot = "/tmp/";
+    /* char *                vision_chroot = "/tmp/"; */
+    char *                vision_chroot = "/Users/okoeroo/dvl/clib/visionftpd/";
 
     pthread_attr_t        attr;
     size_t                stacksize             = 0;

@@ -36,7 +36,8 @@ vfs_t * VFS_create_dir (char * dir_name)
             return NULL;
         }
         vfs_node -> surl        = NULL;
-        vfs_node -> child_nodes = NULL;
+        vfs_node -> dir_list    = NULL;
+        vfs_node -> in_dir      = NULL;
 
         return vfs_node;
     }
@@ -76,67 +77,85 @@ vfs_t * VFS_create_file (char * file_name)
             return NULL;
         }
         vfs_node -> surl        = NULL;
-        vfs_node -> child_nodes = NULL;
+        vfs_node -> dir_list    = NULL;
+        vfs_node -> in_dir      = NULL;
 
         return vfs_node;
     }
 }
 
 
-/* void VFS_print_real (vfs_t * vfs_node, int indent) */
-void VFS_print (vfs_t * vfs_node)
+
+/* Adding sibling VFS node to a dir VFS */
+int VFS_add_sibling_to_directory (vfs_t ** list, vfs_t * entry)
 {
-    if (vfs_node)
+    vfs_t * tmp_list = *list;
+
+    if (!list)
     {
-        if (vfs_node -> node_type == VFS_DIRECTORY)
-            scar_log (1, "D: %s\n", vfs_node -> name);
-        else if (vfs_node -> node_type == VFS_REGULAR_FILE)
-            scar_log (1, "F: %s\n", vfs_node -> name);
-        else if (vfs_node -> node_type == VFS_SYMLINK)
-            scar_log (1, "L: %s\n", vfs_node -> name);
-
-
-        if (vfs_node -> child_nodes)
-            VFS_print (vfs_node -> child_nodes);
-            /* VFS_print_real (vfs_node -> child_nodes, ind); */
-    }
-}
-
-
-/* Adding a child VFS node to a parent VFS */
-int VFS_add_child_to_parent (vfs_t * parent, vfs_t * child)
-{
-    vfs_t * tmp_parent = NULL;
-
-    if (!parent)
-    {
-        scar_log (1, "%s: no parent vfs_t provided\n", __func__); 
+        scar_log (1, "%s: no directory vfs_t pointer provided\n", __func__); 
         return 1;
     }
-    if (!child)
+    if (!entry)
     {
-        scar_log (1, "%s: no child vfs_t provided\n", __func__); 
+        scar_log (1, "%s: no entry vfs_t provided\n", __func__); 
         return 1;
     }
 
-    /*
-    scar_log (1, "At %s adding %s %s\n", parent -> name,
-                                         child -> node_type == VFS_DIRECTORY ? "DIR " : "FILE",
-                                         child -> name);
-    */
-
-    /* Fast-Forward to last child_nodes */
-    tmp_parent = parent;
-    if (tmp_parent -> child_nodes == NULL)
-        tmp_parent -> child_nodes = child;
+    if (*list == NULL)
+    {
+        *list = entry;
+        return 0;
+    }
     else
     {
-        while (tmp_parent -> child_nodes)
+        while (tmp_list -> dir_list)
         {
-            tmp_parent = tmp_parent -> child_nodes;
+            tmp_list = tmp_list -> dir_list;
         }
-        tmp_parent -> child_nodes = child;
+        tmp_list -> dir_list = entry;
+        return 0;
     }
-
-    return 0;
 }
+
+
+void VFS_print_real (vfs_t * vfs_node, int * indent)
+{
+    vfs_t * curr = vfs_node;
+    char * padl  = NULL;
+
+    padl = malloc (sizeof(char) * *indent + 1);
+    memset (padl, ' ', *indent);
+    padl[*indent] = '\0';
+
+    while (curr)
+    {
+        if (curr -> node_type == VFS_DIRECTORY)
+        {
+            scar_log (1, "%sD: %s\n", padl, curr -> name);
+            if (curr -> in_dir)
+            {
+                (*indent)++;
+                VFS_print_real (curr -> in_dir, indent);
+                (*indent)--;
+            }
+        }
+        else if (curr -> node_type == VFS_REGULAR_FILE)
+        {
+            scar_log (1, "%sF: %s\n", padl, curr -> name);
+        }
+        else if (curr -> node_type == VFS_SYMLINK)
+        {
+            scar_log (1, "%sL: %s\n", padl, curr -> name);
+        }
+        curr = curr -> dir_list;
+    }
+    free(padl);
+}
+
+void VFS_print (vfs_t * vfs_node)
+{
+    int i = 0;
+    VFS_print_real (vfs_node, &i);
+}
+
