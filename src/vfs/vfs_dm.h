@@ -39,7 +39,7 @@ typedef struct protocol_s {
 
 /* Transport URL - many per site/cluster, but one per file on host per protocol */
 typedef struct turl_s {
-    time_t            record_time;     /* States the creation or updated time of this record */
+    time_t            timestamp;       /* States the creation or updated time of this record */
     protocol_t *      protocol;        /* Specifies access protocol details for this file */
     char *            path;            /* Abolute path to the file on the Data-Mover */
     filehash_list_t * filehash_list;   /* The current hash value of this file */

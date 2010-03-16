@@ -1,7 +1,7 @@
 #include <pthread.h>
 #include "vfs.h"
 
-
+/*
 vfs_t * VFS_unmarshall (unsigned char * blob)
 {
 }
@@ -9,7 +9,7 @@ vfs_t * VFS_unmarshall (unsigned char * blob)
 unsigned char * VFS_marshall (vfs_t * vfs)
 {
 }
-
+*/
 
 int walkTheDir (char * newrootdir, char * chrootdir, vfs_t ** vfs_parent)
 {

@@ -164,7 +164,7 @@ void VFS_print_real (vfs_t * vfs_node, int * indent)
                 while (turl)
                 {
                     scar_log (1, "%s\t\t- TURL:\n", padl);
-                    scar_log (1, "%s\t\trecord time      : %7d\n", padl, turl -> record_time);
+                    scar_log (1, "%s\t\ttimestamp        : %7d\n", padl, turl -> timestamp);
                     scar_log (1, "%s\t\thas an protocol  : %s\n", padl, turl -> protocol ? "yes" : "no");
                     scar_log (1, "%s\t\tpath             : %s\n", padl, turl -> path);
                     scar_log (1, "%s\t\thas a filehash   : %s\n", padl, turl -> filehash_list ? "yes" : "no");
@@ -261,7 +261,7 @@ int setTURLproperties (turl_t *   turl,
         return 1;
     }
 
-    turl -> record_time   = time(NULL);
+    turl -> timestamp     = time(NULL);
     turl -> protocol      = NULL;
     turl -> path          = path;
     turl -> filehash_list = NULL;
