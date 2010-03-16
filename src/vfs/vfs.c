@@ -2,6 +2,15 @@
 #include "vfs.h"
 
 
+vfs_t * VFS_unmarshall (unsigned char * blob)
+{
+}
+
+unsigned char * VFS_marshall (vfs_t * vfs)
+{
+}
+
+
 int walkTheDir (char * newrootdir, char * chrootdir, vfs_t ** vfs_parent)
 {
     DIR * dirp         = NULL;
@@ -10,7 +19,8 @@ int walkTheDir (char * newrootdir, char * chrootdir, vfs_t ** vfs_parent)
     char * buffer      = NULL;
     int    res         = 0;
 
-    vfs_t * vfs_node   = NULL;
+    vfs_t *  vfs_node  = NULL;
+    turl_t * turl      = NULL;
 
 
     /* Open new directory entry */
@@ -81,6 +91,27 @@ int walkTheDir (char * newrootdir, char * chrootdir, vfs_t ** vfs_parent)
             {
                 /* Adding current VFS node to tree */
                 VFS_add_sibling_to_directory (vfs_parent, vfs_node);
+
+                /* Adding SURL and TURL information to VFS node */
+                vfs_node -> surl = createSURL();
+                if (vfs_node -> surl)
+                {
+                    turl = createTURL();
+                    setTURLproperties (turl,
+                                       buffer,
+                                       sb.st_mode,
+                                       sb.st_uid,
+                                       sb.st_gid,
+                                       sb.st_size,
+                                       sb.st_blksize,
+                                       sb.st_blocks,
+                                       sb.st_atime,
+                                       sb.st_mtime,
+                                       sb.st_ctime);
+                    VFS_add_TURL_to_SURL (vfs_node -> surl, turl);
+                }
+
+                /* Enter sub-directory */
                 walkTheDir (buffer, chrootdir, &(vfs_node -> in_dir));
             }
         }
@@ -96,6 +127,25 @@ int walkTheDir (char * newrootdir, char * chrootdir, vfs_t ** vfs_parent)
             {
                 /* Adding current VFS node to tree */
                 VFS_add_sibling_to_directory (vfs_parent, vfs_node);
+
+                /* Adding SURL and TURL information to VFS node */
+                vfs_node -> surl = createSURL();
+                if (vfs_node -> surl)
+                {
+                    turl = createTURL();
+                    setTURLproperties (turl,
+                                       buffer,
+                                       sb.st_mode,
+                                       sb.st_uid,
+                                       sb.st_gid,
+                                       sb.st_size,
+                                       sb.st_blksize,
+                                       sb.st_blocks,
+                                       sb.st_atime,
+                                       sb.st_mtime,
+                                       sb.st_ctime);
+                    VFS_add_TURL_to_SURL (vfs_node -> surl, turl);
+                }
             }
         }
 

@@ -28,4 +28,33 @@ void VFS_print (vfs_t * vfs_node);
 void * vfs_main (void * rootpath);
 
 
+
+int setTURLproperties (turl_t *   turl,
+                       char *     absolute_path,
+                       mode_t     mode,
+                       uid_t      uid,
+                       gid_t      gid,
+                       off_t      size,
+                       blksize_t  blksize,
+                       blkcnt_t   blocks,
+                       time_t     p_atime,
+                       time_t     p_mtime,
+                       time_t     p_ctime);
+
+/* Adding TURL to a SURL */
+int VFS_add_TURL_to_SURL (surl_t * surl, turl_t * turl);
+
+turl_t * createTURL (void);
+surl_t * createSURL (void);
+
+/* Adding SURL to a VFS node */
+int VFS_add_SURL_to_VFS (vfs_t * entry, surl_t * surl);
+
+
+/* Virtual VFS unmarshall from transport */
+vfs_t * VFS_unmarshall (unsigned char * blob);
+
+/* Virtual VFS marshall for transport */
+unsigned char * VFS_marshall (vfs_t * vfs);
+
 #endif /* VFS_H */

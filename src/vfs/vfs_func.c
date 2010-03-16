@@ -118,11 +118,11 @@ int VFS_add_sibling_to_directory (vfs_t ** list, vfs_t * entry)
     }
 }
 
-
 void VFS_print_real (vfs_t * vfs_node, int * indent)
 {
-    vfs_t * curr = vfs_node;
-    char * padl  = NULL;
+    vfs_t *   curr = vfs_node;
+    turl_t *  turl = NULL;
+    char *    padl = NULL;
 
     padl = malloc (sizeof(char) * *indent + 1);
     memset (padl, ' ', *indent);
@@ -148,6 +148,43 @@ void VFS_print_real (vfs_t * vfs_node, int * indent)
         {
             scar_log (1, "%sL: %s\n", padl, curr -> name);
         }
+
+        if (curr -> surl)
+        {
+            scar_log (1, "%s\t- SURL:\n", padl);
+            scar_log (1, "%s\tnlinks           : %7d\n", padl, (int) curr -> surl -> nlink); 
+            scar_log (1, "%s\tuse_counter      : %7d\n", padl, (int) curr -> surl -> use_counter); 
+            scar_log (1, "%s\thas a filehash   : %s\n", padl, curr -> surl -> filehash_list ? "yes" : "no"); 
+            scar_log (1, "%s\thas an ACL       : %s\n", padl, curr -> surl -> acls ? "yes" : "no"); 
+
+            if (curr -> surl -> turl_list)
+            {
+                turl = curr -> surl -> turl_list;
+
+                while (turl)
+                {
+                    scar_log (1, "%s\t\t- TURL:\n", padl);
+                    scar_log (1, "%s\t\trecord time      : %7d\n", padl, turl -> record_time);
+                    scar_log (1, "%s\t\thas an protocol  : %s\n", padl, turl -> protocol ? "yes" : "no");
+                    scar_log (1, "%s\t\tpath             : %s\n", padl, turl -> path);
+                    scar_log (1, "%s\t\thas a filehash   : %s\n", padl, turl -> filehash_list ? "yes" : "no");
+                    scar_log (1, "%s\t\tusage counter    : %7d\n", padl, turl -> use_counter);
+                    scar_log (1, "%s\t\tmode             : %7d\n", padl, turl -> mode);
+                    scar_log (1, "%s\t\tuid              : %7d\n", padl, turl -> uid);
+                    scar_log (1, "%s\t\tgid              : %7d\n", padl, turl -> gid);
+                    scar_log (1, "%s\t\tsize             : %7d\n", padl, turl -> size);
+                    scar_log (1, "%s\t\tblksize          : %7d\n", padl, turl -> blksize);
+                    scar_log (1, "%s\t\tblocks           : %7d\n", padl, turl -> blocks);
+                    scar_log (1, "%s\t\tatime            : %7d\n", padl, turl -> atime);
+                    scar_log (1, "%s\t\tmtime            : %7d\n", padl, turl -> mtime);
+                    scar_log (1, "%s\t\tctime            : %7d\n", padl, turl -> ctime);
+
+                    turl = turl -> next;
+                }
+            }
+        }
+
+        /* Go to next element */
         curr = curr -> dir_list;
     }
     free(padl);
@@ -159,3 +196,158 @@ void VFS_print (vfs_t * vfs_node)
     VFS_print_real (vfs_node, &i);
 }
 
+turl_t * createTURL (void)
+{
+    turl_t * turl = NULL;
+    turl = malloc (sizeof (turl_t));
+    if (!turl) 
+        scar_log (1, "%s: Out of memory\n", __func__);
+    else
+        memset (turl, 0, sizeof(turl_t));
+
+    return turl;
+}
+
+/*
+int setTURLprotocol   (turl_t *   turl,
+                       char * protocol_name,
+                       is_active,
+                       hostname,
+                       port)
+{
+    if (!turl)
+    {
+        scar_log (1, "%s: No TURL object provided to function\n", __func__);
+        return 1;
+    }
+
+    turl -> protocol protocol_name = protocol_name;
+    turl -> is_active     = is_active;
+    turl -> hostname      = hostname;
+    turl -> port          = port;
+
+    return 0;
+}
+*/
+
+
+int setTURLproperties (turl_t *   turl,
+                       char *     absolute_path,
+                       mode_t     mode,
+                       uid_t      uid,
+                       gid_t      gid,
+                       off_t      size,
+                       blksize_t  blksize,
+                       blkcnt_t   blocks,
+                       time_t     p_atime,
+                       time_t     p_mtime,
+                       time_t     p_ctime)
+{
+    char * path = NULL;
+
+    if (strlen(absolute_path) > PATH_MAX)
+        return 1;
+
+    if (!turl)
+    {
+        scar_log (1, "%s: No TURL object provided to function\n", __func__);
+        return 1;
+    }
+
+    path = strdup(absolute_path);
+    if (!path)
+    {
+        scar_log (1, "%s: Out of memory\n", __func__);
+        return 1;
+    }
+
+    turl -> record_time   = time(NULL);
+    turl -> protocol      = NULL;
+    turl -> path          = path;
+    turl -> filehash_list = NULL;
+    turl -> use_counter   = 0;
+    turl -> mode          = mode;       
+    turl -> uid           = uid;        
+    turl -> gid           = gid;        
+    turl -> size          = size;       
+    turl -> blksize       = blksize;    
+    turl -> blocks        = blocks;     
+    turl -> atime         = p_atime;      
+    turl -> mtime         = p_mtime;      
+    turl -> ctime         = p_ctime;      
+    turl -> next          = NULL;       
+
+    return 0;
+}
+
+/* Adding TURL to a SURL */
+int VFS_add_TURL_to_SURL (surl_t * surl, turl_t * turl)
+{
+    turl_t * tmp = NULL;
+
+    if (!surl)
+    {
+        scar_log (1, "%s: no SURL object presented to function\n", __func__); 
+        return 1;
+    }
+    if (!turl)
+    {
+        scar_log (1, "%s: no TURL object presented to function\n", __func__); 
+        return 1;
+    }
+
+    if (surl -> turl_list == NULL)
+    {
+        surl -> turl_list = turl;
+        return 0;
+    }
+    else
+    {
+        tmp = surl -> turl_list;
+        while (tmp -> next)
+        {
+            tmp = tmp -> next;
+        }
+        tmp -> next = turl;
+        return 0;
+    }
+}
+
+surl_t * createSURL (void)
+{
+    surl_t * surl = NULL;
+    surl = malloc (sizeof (surl_t));
+    if (!surl) 
+        scar_log (1, "%s: Out of memory\n", __func__);
+    else
+        memset (surl, 0, sizeof(surl_t));
+
+    return surl;
+}
+
+
+/* Adding SURL to a VFS node */
+int VFS_add_SURL_to_VFS (vfs_t * entry, surl_t * surl)
+{
+    if (!entry)
+    {
+        scar_log (1, "%s: no VFS object presented to function\n", __func__); 
+        return 1;
+    }
+    if (!surl)
+    {
+        scar_log (1, "%s: no SURL object presented to function\n", __func__); 
+        return 1;
+    }
+
+    if (entry -> surl != NULL)
+    {
+        scar_log (1, "%s: VFS object already has a SURL, skipping linkage\n", __func__); 
+        return 1;
+    }
+    else
+    {
+        entry -> surl = surl;
+        return 0;
+    }
+}

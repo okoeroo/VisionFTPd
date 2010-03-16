@@ -39,25 +39,27 @@ typedef struct protocol_s {
 
 /* Transport URL - many per site/cluster, but one per file on host per protocol */
 typedef struct turl_s {
-    protocol_t      protocol;    /* Specifies access protocol details for this file */
-    char *          path;        /* Path to the file, relative to the data-mover chroot-ed root */
-    filehash_t *    filehash;    /* The current hash value of this file */
-    int             use_counter; /* This is to keep track of the usage of this file. Needed for hot-file counter */
-    mode_t          mode;        /* protection */
-    uid_t           uid;         /* user ID of owner */
-    gid_t           gid;         /* group ID of owner */
-    off_t           size;        /* total size, in bytes */
-    blksize_t       blksize;     /* blocksize for filesystem I/O */
-    blkcnt_t        blocks;      /* number of blocks allocated */
-    time_t          atime;       /* time of last access */
-    time_t          mtime;       /* time of last modification */
-    time_t          ctime;       /* time of last status change */
+    time_t            record_time;     /* States the creation or updated time of this record */
+    protocol_t *      protocol;        /* Specifies access protocol details for this file */
+    char *            path;            /* Abolute path to the file on the Data-Mover */
+    filehash_list_t * filehash_list;   /* The current hash value of this file */
+    int               use_counter;     /* This is to keep track of the usage of this file. Needed for hot-file counter */
+    mode_t            mode;            /* protection */
+    uid_t             uid;             /* user ID of owner */
+    gid_t             gid;             /* group ID of owner */
+    off_t             size;            /* total size, in bytes */
+    blksize_t         blksize;         /* blocksize for filesystem I/O */
+    blkcnt_t          blocks;          /* number of blocks allocated */
+    time_t            atime;           /* time of last access */
+    time_t            mtime;           /* time of last modification */
+    time_t            ctime;           /* time of last status change */
+    struct turl_s *   next;            /* Next TURL in SURL or TURL list */
 } turl_t;
 
 
 /* List of Transport URLs - This is the highest structure pushed from a Data-Mover to a Commander */
 typedef struct turl_list_s {
-    turl_t turl;
+    turl_t * turl;
     struct turl_list_s *next;
 } turl_list_t;
 
@@ -65,7 +67,7 @@ typedef struct turl_list_s {
 /* Storage URL - 1 file can be accesible at multiple TURLs */
 typedef struct surl_s {
     nlink_t           nlink;         /* Number of available TURL links */
-    turl_list_t *     turl_list;     /* List of TURLs to access a file from a Data-Mover */
+    turl_t *          turl_list;     /* List of TURLs to access a file from a Data-Mover */
     int               use_counter;   /* Usage counter to signal hot files */
     filehash_list_t * filehash_list; /* Cluster wide file hashes */
     acl_t *           acls;
