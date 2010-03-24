@@ -78,7 +78,7 @@ int main (int argc, char * argv[])
     else
     {
         scar_log (1, "The Virtual File System\n");
-        /* VFS_print (vfs_root); */
+        VFS_print (vfs_root);
     }
 
 

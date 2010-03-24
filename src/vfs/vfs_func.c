@@ -299,6 +299,7 @@ int VFS_add_TURL_to_SURL (surl_t * surl, turl_t * turl)
     if (surl -> turl_list == NULL)
     {
         surl -> turl_list = turl;
+        surl -> nlink++;
         return 0;
     }
     else
@@ -309,6 +310,7 @@ int VFS_add_TURL_to_SURL (surl_t * surl, turl_t * turl)
             tmp = tmp -> next;
         }
         tmp -> next = turl;
+        surl -> nlink++;
         return 0;
     }
 }

@@ -68,6 +68,93 @@ int move_bytes_commited_to_next_command (buffer_state_t * read_buffer_state)
     }
 }
 
+int EPRT_to_sockaddr (unsigned char * str, struct sockaddr ** addr, socklen_t * addr_len)
+{
+    int      len         = 0;
+    char *   foo         = NULL;
+    char *   s_addr_type = NULL;
+    char *   s_ip        = NULL;
+    char *   s_port      = NULL;
+    
+    foo = (char *) str;
+    
+    if (foo[0] != '|')
+    {
+        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
+        return 1;
+    }
+    /* Move up by one */
+    foo = &foo[1];
+
+    len = strlen (foo);
+    len = len - strlen(strstr(foo, "|"));
+    
+    s_addr_type = calloc (sizeof (char), len + 1);
+    strncpy (s_addr_type, foo, len);
+    scar_log (1, "%s: %s\n", __func__, s_addr_type);
+    foo = strstr(foo, "|");
+    if (foo[0] != '|')
+    {
+        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
+        return 1;
+    }
+
+    /* Move up by one */
+    foo = &foo[1];
+
+    len = strlen (foo);
+    len = len - strlen(strstr(foo, "|"));
+    
+    s_ip = calloc (sizeof (char), len + 1);
+    strncpy (s_ip, foo, len);
+    scar_log (1, "%s: %s\n", __func__, s_ip);
+    foo = strstr(foo, "|");
+    if (foo[0] != '|')
+    {
+        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
+        return 1;
+    }
+
+    /* Move up by one */
+    foo = &foo[1];
+
+    len = strlen (foo);
+    len = len - strlen(strstr(foo, "|"));
+    
+    s_port = calloc (sizeof (char), len + 1);
+    strncpy (s_port, foo, len);
+    scar_log (1, "%s: %s\n", __func__, s_port);
+    foo = strstr(foo, "|");
+    if (foo[0] != '|')
+    {
+        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
+        return 1;
+    }
+
+    /* done */
+    return 0;
+}
+
+int PORT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * port)
+{
+    unsigned int a1, a2, a3, a4, p1, p2;
+
+    if (sscanf((char *)str, "%u,%u,%u,%u,%u,%u",
+                &a1, &a2, &a3, &a4, &p1, &p2) != 6 ||
+            a1 > 255 || a2 > 255 || a3 > 255 || a4 > 255 ||
+            p1 > 255 || p2 > 255 || (a1|a2|a3|a4) == 0 ||
+            (p1 | p2) == 0) {
+        return 501;     
+    }           
+        /* htonl((a1 << 24) | (a2 << 16) | (a3 << 8) | a4); */
+
+    *port = (p1 << 8) | p2;
+    *host_ip = malloc (sizeof (char) * 16);
+    snprintf (*host_ip, 15, "%d.%d.%d.%d", a1, a2, a3, a4);
+
+    return 200;
+}
+
 int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft)
 {
     int i = 0;
@@ -125,46 +212,6 @@ int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft)
     return 0;
 }
 
-int parse_short_host_port (unsigned char * short_host_port, file_transfer_t ** ft)
-{
-    int i = 0;
-
-    unsigned char * str       = short_host_port;
-
-    /* struct sockaddr_storage ss; */
-
-    unsigned char * address        = NULL;
-    unsigned short  port           = 0;
-    unsigned char   port_s[2];
-
-    address = calloc (sizeof (unsigned char), 4 + 1);
-
-    /* IPv4 only */
-    for (i = 0; i < 4; i++)
-    {
-        str = &str[1];
-        if (str[0] == '\0')
-            return 1;
-
-        address[i] = str[0];
-    }
-
-    bzero (port_s, 2);
-    for (i = 0; i < 2; i++)
-    {
-        str = &str[1];
-        if (str[0] == '\0')
-            return 1;
-
-        port_s[i] = str[0];
-    }
-
-    port = (unsigned short) *port_s;
-
-    scar_log (1, "Ok, this is what I made of this: address %s, port %d\n", address, port);
-
-    return 0;
-}
 
 int handle_ftp_initialization (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
@@ -200,6 +247,9 @@ int handle_message_not_understood (ftp_state_t * ftp_state, buffer_state_t * rea
     }
     else
     {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         write_buffer_state -> num_bytes = ret;
         return NET_RC_MUST_WRITE;
     }
@@ -219,6 +269,9 @@ int handle_ftp_USER (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     else
     {
         ftp_state -> ftp_user = user;
+
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
 
         /* Announce anoymous log-in allowed */
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "331 Password required for %s\r\n", ftp_state -> ftp_user);
@@ -248,6 +301,9 @@ int handle_ftp_PASS (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     {
         ftp_state -> ftp_passwd = pass;
 
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "230 User logged in. Welcome to %s\r\n", ftp_service_banner);
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
@@ -273,6 +329,9 @@ int handle_ftp_SYST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
     else
     {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "215 UNIX Type: L8 Version: %s %s\r\n", APP_NAME, APP_VERSION);
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
@@ -297,6 +356,9 @@ int handle_ftp_FEAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
     else
     {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "211- Extensions supported:\r\n SIZE\r\n REST STREAM\r\n211 END\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
@@ -321,6 +383,9 @@ int handle_ftp_PWD  (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
     else
     {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         /* Will need integration with the VFS */
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "257 \"/\" is current directory\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
@@ -355,6 +420,9 @@ int handle_ftp_CWD  (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             return NET_RC_UNHANDLED;
         }
 
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         /* Will need integration with the VFS */
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "250 \"/\" is current directory\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
@@ -380,6 +448,9 @@ int handle_ftp_NOOP (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
     else
     {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
         /* Will need integration with the VFS */
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200 NOOP command successful\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
@@ -542,7 +613,6 @@ int handle_ftp_SIZE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 }
 
 
-
 int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
     const char *        cmd_trigger     = "LPRT";
@@ -588,12 +658,69 @@ int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
 }
 
+
+
+
+int handle_ftp_EPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
+{
+    const char *        cmd_trigger     = "EPRT";
+    unsigned char *     host_port       = NULL;
+    /* file_transfer_t *   ft              = NULL; */
+    unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
+
+    struct sockaddr * addr     = NULL;
+    socklen_t         addr_len = 0;
+
+
+    if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
+    {
+        /* No match */
+        return NET_RC_UNHANDLED;
+    }
+    else
+    {
+        host_port = malloc (sizeof (char) * 256);
+        if (sscanf ((char *) bufp,
+                    "EPRT %255s*s", 
+                    host_port) <= 0)
+        {
+            /* No match */
+            free(host_port);
+            return NET_RC_UNHANDLED;
+        }
+        else
+        {
+            /* Move commited bytes to next command in the buffer (if there) */
+            move_bytes_commited_to_next_command (read_buffer_state);
+
+            EPRT_to_sockaddr (host_port, &addr, &addr_len);
+
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
+            if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+            {
+                /* Buffer overrun */
+                free(host_port);
+                return NET_RC_DISCONNECT;
+            }
+            else
+            {
+                free(host_port);
+                return NET_RC_MUST_WRITE;
+            }
+        }
+    }
+}
+
+
+
 int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
     const char *      cmd_trigger       = "PORT";
     unsigned char *   short_host_port   = NULL;
-    file_transfer_t * ft                = NULL;
     unsigned char *   bufp              = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
+    char *            host              = NULL;
+    unsigned short    port              = 0;
+    int               s                 = -1;
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
@@ -616,8 +743,24 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             /* Move commited bytes to next command in the buffer (if there) */
             move_bytes_commited_to_next_command (read_buffer_state);
 
-            parse_short_host_port (short_host_port, &ft);
-            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
+            PORT_to_host_port (short_host_port, &host, &port);
+            if (host != NULL)
+            {
+                scar_log (1, "%s: Got PORT information: %s:%d\n", __func__, host, port);
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
+
+                /* Fire off a connection back to the Client on the given host and port info */
+                s = firstTCPSocketConnectingCorrectly (host, port);
+                scar_log (1, "%s: opened client socket to client. fd is %d\n", __func__, s);
+            }
+            else
+            {
+                scar_log (1, "%s: Parse error in PORT information.\n", __func__);
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "501 Error in IP Address or Port number in PORT message\r\n");
+            }
+
+            /* parse_short_host_port (short_host_port, &ft); */
+
             if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
             {
                 /* Buffer overrun */
@@ -629,6 +772,61 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                 free(short_host_port);
                 return NET_RC_MUST_WRITE;
             }
+        }
+    }
+}
+
+int handle_ftp_STAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
+{
+    const char *        cmd_trigger     = "STAT";
+    unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
+
+    if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
+    {
+        /* No match */
+        return NET_RC_UNHANDLED;
+    }
+    else
+    {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
+        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "211 Server status is OK.\r\n");
+        if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+        {
+            /* Buffer overrun */
+            return NET_RC_DISCONNECT;
+        }
+        else
+        {
+            return NET_RC_MUST_WRITE;
+        }
+    }
+}
+int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
+{
+    const char *        cmd_trigger     = "LIST";
+    unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
+
+    if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
+    {
+        /* No match */
+        return NET_RC_UNHANDLED;
+    }
+    else
+    {
+        /* Move commited bytes to next command in the buffer (if there) */
+        move_bytes_commited_to_next_command (read_buffer_state);
+
+        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "150 Opening ASCII mode data connection for /bin/ls\r\n");
+        if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+        {
+            /* Buffer overrun */
+            return NET_RC_DISCONNECT;
+        }
+        else
+        {
+            return NET_RC_MUST_WRITE;
         }
     }
 }

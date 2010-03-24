@@ -224,8 +224,12 @@ void * threadingDaemonClientHandler (void * arg)
     }
 
 net_disconnect:
+    scar_log (1, "Shutting down %d...\n", client_socket);
     shutdown (client_socket, SHUT_RDWR);
+    scar_log (1, "Closing %d...\n", client_socket);
     close(client_socket);
+    scar_log (1, "Socket is done.\n", client_socket);
+
     net_thread_pool_node -> net_thread_parameters.client_fd = -1;
 
     free_buffer_state (&read_buffer_state);

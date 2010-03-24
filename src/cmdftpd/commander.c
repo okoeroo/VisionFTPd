@@ -96,6 +96,22 @@ int commander_active_io (buffer_state_t * read_buffer_state, buffer_state_t * wr
     if ((rc = handle_ftp_SIZE (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
         goto finalize_message_handling;
 
+    /* Handle STAT message */
+    if ((rc = handle_ftp_STAT (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
+        goto finalize_message_handling;
+
+    /* Handle LIST message */
+    if ((rc = handle_ftp_LIST (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
+        goto finalize_message_handling;
+
+    /* Handle TYPE message */
+    if ((rc = handle_ftp_TYPE (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
+        goto finalize_message_handling;
+
+    /* Handle EPRT message */
+    if ((rc = handle_ftp_EPRT (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
+        goto finalize_message_handling;
+
     /* Handle LPRT message */
     if ((rc = handle_ftp_LPRT (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED)
         goto finalize_message_handling;
@@ -216,7 +232,7 @@ int commander_state_initiator (void ** state, void * vfs)
         ftp_state -> vfs_root    = (vfs_t *) vfs;
 
         /* DEBUG */
-        VFS_print (ftp_state -> vfs_root);
+        /* VFS_print (ftp_state -> vfs_root); */
     }
     return 0;
 }
