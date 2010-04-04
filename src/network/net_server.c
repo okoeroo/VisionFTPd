@@ -388,42 +388,16 @@ Return:
     0 : Good
    !0 : Not good
 ****************************************************/
-#ifdef OLD_ACCEPT
-int net_accept_new_client_socket (int master_socket, int * client_socket, char ** remote_host)
-{
-    struct sockaddr_storage address;
-    unsigned int            addrlen    = sizeof (address);
-    int                     new_socket = -1;
-
-    /* Open the new socket as 'new_socket' */
-    if ((new_socket = accept(master_socket, (struct sockaddr *)&address, &addrlen)) < 0)
-    {
-        net_printErrNo (errno, __func__);
-        return errno;
-    }
-
-    /* Get remote_host string from opened connection */
-    if (!*remote_host)
-        *remote_host = (char *) malloc (sizeof(char) * MAX_HOSTNAME);
-
-    net_addr2host (remote_host, MAX_HOSTNAME, address);
-
-    /* add new socket to list of sockets */
-    *client_socket = new_socket;
-
-    return 0;
-}
-#else
 int net_accept_new_client_socket (int master_socket, char ** remote_host)
 {
     struct sockaddr_storage from;
     unsigned int            fromlen = sizeof (from);
-    int                client_fd = 0;
-    int                gotit = 0;
-    long               flags = 0;
-    fd_set             fdset;
-    struct timeval     timeout;
-    int                n = 0;;
+    int                     client_fd = 0;
+    int                     gotit = 0;
+    long                    flags = 0;
+    fd_set                  fdset;
+    struct timeval          timeout;
+    int                     n = 0;;
 
     gotit = 0;
 
@@ -472,5 +446,4 @@ int net_accept_new_client_socket (int master_socket, char ** remote_host)
 
     return(client_fd);
 }
-#endif
 

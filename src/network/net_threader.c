@@ -89,9 +89,8 @@ void * threadingDaemonClientHandler (void * arg)
     {
         FD_ZERO(&fdset);
         FD_SET(client_socket, &fdset);
-        timeout.tv_sec  = 0;
-        /* timeout.tv_usec = 1000; */
-        timeout.tv_usec = 100000;
+        timeout.tv_sec  = 15;
+        timeout.tv_usec = 0;
 
         n = select(client_socket + 1, &fdset, (fd_set *) 0, &fdset, &timeout);
         if (n < 0 && errno != EINTR)
