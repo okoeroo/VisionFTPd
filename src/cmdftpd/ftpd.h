@@ -61,6 +61,7 @@ typedef struct ftp_state_s {
 } ftp_state_t;
 
 
+void * startFTPCallbckThread (void * arg);
 
 char * get_ftp_service_banner (void);
 void set_ftp_service_banner (char *);
@@ -68,7 +69,7 @@ void set_ftp_service_banner (char *);
 int move_bytes_commited_to_next_command (buffer_state_t * read_buffer_state);
 int parse_long_host_port (unsigned char * long_host_port, file_transfer_t ** ft);
 int parse_short_host_port (unsigned char * short_host_port, file_transfer_t ** ft);
-int EPRT_to_sockaddr (unsigned char * str, struct sockaddr ** addr, socklen_t * addr_len);
+int EPRT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * port);
 int PORT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * port);
 
 int handle_ftp_initialization (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state);

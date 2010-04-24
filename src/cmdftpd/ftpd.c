@@ -26,6 +26,12 @@ static char * ftp_service_banner = NULL;
 ****************************************************************************************************/
 
 
+void * startFTPCallbckThread (void * arg)
+{
+    return NULL;
+}
+
+
 void set_ftp_service_banner (char * banner)
 {
     ftp_service_banner = banner;
@@ -68,71 +74,55 @@ int move_bytes_commited_to_next_command (buffer_state_t * read_buffer_state)
     }
 }
 
-int EPRT_to_sockaddr (unsigned char * str, struct sockaddr ** addr, socklen_t * addr_len)
+int EPRT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * port)
 {
-    int      len         = 0;
-    char *   foo         = NULL;
-    char *   s_addr_type = NULL;
-    char *   s_ip        = NULL;
-    char *   s_port      = NULL;
-    
-    foo = (char *) str;
-    
-    if (foo[0] != '|')
-    {
-        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
-        return 1;
-    }
-    /* Move up by one */
-    foo = &foo[1];
+    unsigned char * tmp_str = str;
+    unsigned char * tmp_port = NULL;
+    int             i = 0;
+    /* EPRT |2|::1|59616| */
 
-    len = strlen (foo);
-    len = len - strlen(strstr(foo, "|"));
-    
-    s_addr_type = calloc (sizeof (char), len + 1);
-    strncpy (s_addr_type, foo, len);
-    scar_log (1, "%s: %s\n", __func__, s_addr_type);
-    foo = strstr(foo, "|");
-    if (foo[0] != '|')
+    if (!(str && (strlen((char *) str) > 4)))
+        return 500;
+
+    if (tmp_str[1] == '1') /* IPv4 */
     {
-        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
-        return 1;
+        scar_log (1, "%s: EPRT signaled IPv4: parsing: %s\n", __func__, tmp_str);
+    }
+    else if (tmp_str[1] == '2') /* IPv6 */
+    {
+        scar_log (1, "%s: EPRT signaled IPv6: parsing: %s\n", __func__, tmp_str);
     }
 
-    /* Move up by one */
-    foo = &foo[1];
+    tmp_str = &tmp_str[3];
 
-    len = strlen (foo);
-    len = len - strlen(strstr(foo, "|"));
-    
-    s_ip = calloc (sizeof (char), len + 1);
-    strncpy (s_ip, foo, len);
-    scar_log (1, "%s: %s\n", __func__, s_ip);
-    foo = strstr(foo, "|");
-    if (foo[0] != '|')
+    *host_ip = calloc (sizeof (char), 64);
+    for (i = 0; (i < 64) && (tmp_str[0] != '\0') && (tmp_str[0] != '|'); i++)
     {
-        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
-        return 1;
+        (*host_ip)[i] = tmp_str;
+        tmp_str = &tmp_str[1];
+        scar_log (1, "%s: %s\n", __func__, *host_ip);
     }
 
-    /* Move up by one */
-    foo = &foo[1];
+    if (tmp_str[0] == '\0')
+        return 500;
 
-    len = strlen (foo);
-    len = len - strlen(strstr(foo, "|"));
-    
-    s_port = calloc (sizeof (char), len + 1);
-    strncpy (s_port, foo, len);
-    scar_log (1, "%s: %s\n", __func__, s_port);
-    foo = strstr(foo, "|");
-    if (foo[0] != '|')
+    tmp_str = &tmp_str[1];
+    tmp_port = calloc (sizeof (char), 6);
+    for (i = 0; (i < 6) && (tmp_str[0] != '\0') && (tmp_str[0] != '|'); i++)
     {
-        scar_log (1, "%s: Parse error. Expecting a \"|\".\n", __func__);
-        return 1;
+        tmp_port[i] = tmp_str;
+        tmp_str = &tmp_str[1];
     }
 
-    /* done */
-    return 0;
+    scar_log (1, "%s: EPRT host: %s\n", __func__, *host_ip);
+    scar_log (1, "%s: EPRT port: %s\n", __func__, tmp_port);
+
+/*
+    *port = (p1 << 8) | p2;
+    *host_ip = malloc (sizeof (char) * 16);
+    snprintf (*host_ip, 15, "%d.%d.%d.%d", a1, a2, a3, a4);
+*/
+    return 200;
 }
 
 int PORT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * port)
@@ -668,8 +658,12 @@ int handle_ftp_EPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     /* file_transfer_t *   ft              = NULL; */
     unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
 
+    char *            host              = NULL;
+    unsigned short    port              = 0;
+    /*
     struct sockaddr * addr     = NULL;
     socklen_t         addr_len = 0;
+    */
 
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
@@ -690,10 +684,12 @@ int handle_ftp_EPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         }
         else
         {
+            /* Parse EPRT info */
+            EPRT_to_host_port (host_port, &host, &port);
+
             /* Move commited bytes to next command in the buffer (if there) */
             move_bytes_commited_to_next_command (read_buffer_state);
 
-            EPRT_to_sockaddr (host_port, &addr, &addr_len);
 
             write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
             if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
@@ -776,10 +772,12 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
 }
 
+
 int handle_ftp_STAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
     const char *        cmd_trigger     = "STAT";
     unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
+    char *              output          = NULL;
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
@@ -788,10 +786,25 @@ int handle_ftp_STAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
     else
     {
+        /* Handle stat */
+        if (ftp_state && 
+            (output = VFS_list_by_full_path (ftp_state -> vfs_root, "/")))
+        {
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s", output);
+
+            /* Must free output */
+            free(output);
+        }
+        else
+        {
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 File does not exist");
+        }
+
+
         /* Move commited bytes to next command in the buffer (if there) */
         move_bytes_commited_to_next_command (read_buffer_state);
 
-        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "211 Server status is OK.\r\n");
+        /* write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "211 Server status is OK.\r\n"); */
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
             /* Buffer overrun */

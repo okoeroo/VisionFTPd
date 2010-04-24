@@ -36,11 +36,13 @@ int commander_active_io (buffer_state_t * read_buffer_state, buffer_state_t * wr
     ftp_state_t * ftp_state = *(ftp_state_t **)state;
     int rc                  = 0;
 
+
     /* FTP connection state initialization */
     if (ftp_state == NULL)
     {
-        ftp_state = malloc (sizeof (ftp_state_t));
-        memset (ftp_state, 0, sizeof (ftp_state_t));
+        scar_log (1, "%s: Error: the ftp_state object was not yet created!\n", __func__);
+        rc = NET_RC_DISCONNECT;
+        goto finalize_message_handling;
     }
 
 #ifdef DEBUG
@@ -50,8 +52,6 @@ int commander_active_io (buffer_state_t * read_buffer_state, buffer_state_t * wr
     /* Init phase for the FTP command channel */
     if (ftp_state -> init == 0)
     {
-        ftp_state -> init = 1;
-
         rc = handle_ftp_initialization (ftp_state, NULL, write_buffer_state);
         goto finalize_message_handling;
     }
@@ -143,19 +143,17 @@ int commander_idle_io (buffer_state_t * write_buffer_state, void ** state)
     /* FTP connection state initialization */
     if (ftp_state == NULL)
     {
-        ftp_state = malloc (sizeof (ftp_state_t));
-        memset (ftp_state, 0, sizeof (ftp_state_t));
+        scar_log (1, "%s: Error: the ftp_state object was not yet created!\n", __func__);
+        rc = NET_RC_DISCONNECT;
+        goto finalize_message_handling;
     }
 
     /* Init phase for the FTP command channel */
     if (ftp_state -> init == 0)
     {
-        ftp_state -> init = 1;
-
         rc = handle_ftp_initialization (ftp_state, NULL, write_buffer_state);
         goto finalize_message_handling;
     }
-
 
 finalize_message_handling:
     *state = (void *) ftp_state;
@@ -214,6 +212,7 @@ int commander_state_initiator (void ** state, void * vfs)
         /* Out of memory! */
         return 1;
     }
+
     
     memset (ftp_state, 0, sizeof (ftp_state_t));
     if (ftp_state)
@@ -233,11 +232,12 @@ int commander_state_initiator (void ** state, void * vfs)
 
         /* DEBUG */
         /* VFS_print (ftp_state -> vfs_root); */
+
+        *state = ftp_state;
     }
     return 0;
 }
 
-/* TODO: I need a state liberator! */
 
 /* Main daemon start for the commander */
 /* int startCommander (int port, int max_clients, char * ftp_banner) */
@@ -246,6 +246,7 @@ void * startCommander (void * arg)
     commander_options_t * commander_options = *(commander_options_t **) arg;
 
     set_ftp_service_banner(commander_options -> ftp_banner);
+
 
     threadingDaemonStart (commander_options -> port, 
                           commander_options -> max_clients, 

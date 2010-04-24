@@ -1,4 +1,5 @@
 #include "net_threader.h"
+/* #include "ftpd.h" */
 
 
 buffer_state_t * init_buffer_state (size_t buffer_size)
@@ -81,7 +82,9 @@ void * threadingDaemonClientHandler (void * arg)
     /* Initiate state handle */
     if (net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func != 0)
     {
-         (* net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func)(&read_return_state, net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg);
+        (* net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func)(&read_return_state, net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg);
+        /* Debug */
+        /* scar_log (1, "--------------- foo! %s\n", ((ftp_state_t *) read_return_state) -> vfs_root -> name); */
     }
 
     scar_log (1, "Acceptence of the client connection was Perfect! - %d - awaiting info\n", client_socket); 
@@ -89,7 +92,7 @@ void * threadingDaemonClientHandler (void * arg)
     {
         FD_ZERO(&fdset);
         FD_SET(client_socket, &fdset);
-        timeout.tv_sec  = 15;
+        timeout.tv_sec  = 1;
         timeout.tv_usec = 0;
 
         n = select(client_socket + 1, &fdset, (fd_set *) 0, &fdset, &timeout);

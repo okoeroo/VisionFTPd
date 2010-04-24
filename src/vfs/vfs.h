@@ -8,6 +8,13 @@
 #ifndef VFS_H
     #define VFS_H
 
+#define BUF_SIZE_LIST 4096
+
+vfs_t * VFS_path_exists (vfs_t * node, char * path);
+vfs_t * VFS_change_dir (vfs_t * current, char * path);
+char * VFS_list_by_full_path (vfs_t * root, char * path);
+
+
 /* Walk through the directory */
 int walkTheDir (char * newrootdir, char * chrootdir, vfs_t ** vfs_parent);
 

@@ -1,5 +1,203 @@
 #include "vfs.h"
+#include <errno.h>
 
+vfs_t * VFS_path_exists (vfs_t * node, char * path)
+{
+    char *  tmp_path    = NULL;
+    char *  tmp_path2   = NULL;
+    char *  a_dir       = NULL;
+    int     len         = 0;
+    vfs_t * my_node     = NULL;
+    int     found       = 0;
+
+    /* Input check */
+    if ((path == NULL) || (node == NULL))
+    {
+        return NULL; /* No such file or directory */
+    }
+
+    /* Absolute or relative path equalizer */
+    if (path[0] == '/')
+    {
+        tmp_path = &path[1];
+    }
+
+    /* Search for a '/' and count amount of characters for the first directory in the path */
+    if ((tmp_path2 = strchr(tmp_path, '/')) == NULL)
+    {
+        len = strlen(tmp_path) - strlen(tmp_path2);
+    }
+    else
+    {
+        len = strlen(tmp_path);
+    }
+
+
+    /* Working with the directory */
+    a_dir = malloc (sizeof (char) * (len + 1));
+
+    /* Getting the directory */
+    strncpy (a_dir, path, len);
+
+    /* search at VFS node 'current' for a_dir */
+    node = my_node;
+    while (my_node -> dir_list)
+    {
+        my_node = my_node -> dir_list;
+
+        /* This makes the VFS case sensitive */
+        if (strcmp (my_node -> name, a_dir) == 0)
+        {
+            /* Found entry */
+            found = 1;
+            break;
+        }
+    }
+
+    /* Clear temp data */
+    free(a_dir);
+
+    /* The current(ly evaluating) directory didn't hold the element you were looking for */
+    if (found == 0)
+        return NULL;
+
+
+    /* If there was a '/' found in path, then advance the tmp_path beyond the slash or we're done */
+    if (tmp_path2)
+    {
+        /* Test for: mydir/ */
+        if (tmp_path[1] != '\0')
+        {
+            tmp_path = &tmp_path[1];
+
+            /* Dive into the next directory */
+            return VFS_change_dir (my_node, tmp_path);
+        }
+        else
+        {
+            /* Or done */
+            return my_node;
+        }
+    }
+    else
+    {
+        return my_node;
+    }
+}
+
+
+
+vfs_t * VFS_change_dir (vfs_t * current, char * path)
+{
+    char *  tmp_path    = NULL;
+    char *  a_dir       = NULL;
+    int     len         = 0;
+    vfs_t * changed_dir = NULL;
+
+
+    /* Input check */
+    if ((path == NULL) || (current == NULL))
+    {
+        return NULL; /* No such file or directory */
+    }
+
+    /* Search for a '/' and 
+       count amount of characters for the first directory 
+       in the path */
+    if ((tmp_path = strchr(path, '/')) == NULL)
+    {
+        len = strlen(path) - strlen(tmp_path);
+    }
+    else
+    {
+        len = strlen(path);
+    }
+
+
+    /* Working with the directory */
+    a_dir = malloc (sizeof (char) * (len + 1));
+
+    /* Getting the directory */
+    strncpy (a_dir, path, len);
+
+    /* search at VFS node 'current' for a_dir */
+
+    /* Clear temp data */
+    free(a_dir);
+
+
+    /* If there was a '/' found in path, then advance the tmp_path beyond the slash or we're done */
+    if (tmp_path)
+    {
+        /* Test for: mydir/ */
+        if (tmp_path[1] != '\0')
+        {
+            tmp_path = &tmp_path[1];
+
+            /* Dive into the next directory */
+            return VFS_change_dir (current, tmp_path);
+        }
+        else
+        {
+            /* Or done */
+            return changed_dir;
+        }
+    }
+    else
+    {
+        return changed_dir;
+    }
+}
+
+
+/* Return file list by searching the VFS on a given path */
+char * VFS_list_by_full_path (vfs_t * root, char * path)
+{
+    vfs_t * node = NULL;
+    char * output = NULL;
+
+    if (path == NULL)
+    {
+        scar_log (1, "%s: Error: No path provided.\n", __func__);
+        return NULL;
+    }
+    if (root == NULL)
+    {
+        scar_log (1, "%s: Error: No VFS object provided.\n", __func__);
+        return NULL;
+    }
+
+    /* Output of STAT */
+    output = malloc (sizeof (char) * BUF_SIZE_LIST);
+
+    /* Starting part of the STAT return message */
+    snprintf (output, BUF_SIZE_LIST - 1, "211- status of %s:\r\n", path); 
+
+    node = root -> in_dir;
+    do
+    {
+        if (node)
+            break;
+
+        if (node -> name)
+        {
+            scar_log (1, "2 ---> node -> name = %s\n", node -> name);
+            snprintf (output,
+                      BUF_SIZE_LIST - 1, "%s%crwxr-xr-x   1 root users          4096 Nov 22 2009 foo\r\n", 
+                      output, 
+                      node -> node_type == VFS_DIRECTORY ? 'd' : node -> node_type == VFS_REGULAR_FILE ? '-' : node -> node_type == VFS_SYMLINK ? 'l' : '?',
+                      node -> name);
+        }
+
+        node = node -> dir_list;
+    }
+    while (node);
+
+    /* Finalizing list output for STAT output */
+    snprintf (output, BUF_SIZE_LIST - 1, "%s211 End of status\r\n", output);
+
+    return output;
+}
 
 
 /* Create a new VFS Directory node */
