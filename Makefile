@@ -24,7 +24,7 @@ CPPFLAGS = \
 	-Isrc/vfs/ \
 	-I. \
 
-LFLAGS = -lssl -lcrypto
+LFLAGS = -lssl -lcrypto -lpthread
 
 
 SYS = -s
