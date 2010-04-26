@@ -1,0 +1,19 @@
+Project:  VisionFTPd
+Licence:  MIT
+
+
+The VisionFTPd tool is currently a hobby project of mine to explore networked control and data interface usage.
+
+
+The first release will be called “Hydrogen”.
+
+The VisionFTPd will be split into two thread types, a Commander and a Data-Mover. The Commander will serve a Virtual FileSystem (VFS) and make this accessible by use command or query protocol. The Data-Movers will serve data on its disk pool and push its hosted files and directories to the Commander. The Commander will control the Data-Movers to perform a networked task like performing the file transfer.
+
+The Hydrogen release will serve as an unclustered FTP service.
+
+
+The Helium release will improve on many things...
+
+
+
+
