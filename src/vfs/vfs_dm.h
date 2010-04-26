@@ -58,7 +58,8 @@ typedef struct turl_s {
     uid_t             uid;             /* user ID of owner */
     gid_t             gid;             /* group ID of owner */
     off_t             size;            /* total size, in bytes */
-    blksize_t         blksize;         /* blocksize for filesystem I/O */
+    off_t             blksize;         /* blocksize for filesystem I/O */
+    /* blksize_t         blksize; */        /* blocksize for filesystem I/O */   /* WTF! Why is the blksize_t NOT or NEVER defined on Linux!!! Makes no sense */
     blkcnt_t          blocks;          /* number of blocks allocated */
     time_t            atime;           /* time of last access */
     time_t            mtime;           /* time of last modification */
