@@ -170,22 +170,32 @@ char * VFS_list_by_full_path (vfs_t * root, char * path)
     /* Output of STAT */
     output = malloc (sizeof (char) * BUF_SIZE_LIST);
 
-    /* Starting part of the STAT return message */
-    snprintf (output, BUF_SIZE_LIST - 1, "211- status of %s:\r\n", path); 
+    /* Set start */
+    node = root;
 
-    node = root -> in_dir;
+    /* Starting part of the STAT return message */
+    snprintf (output, BUF_SIZE_LIST - 1, "211- status of %s:\r\n", node -> name); 
+
+    /* Step into directory */
+    node = node -> in_dir;
+
+    /* Cycle this directory */
     do
     {
-        if (node)
+        if (!node)
             break;
 
         if (node -> name)
         {
-            scar_log (1, "2 ---> node -> name = %s\n", node -> name);
             snprintf (output,
-                      BUF_SIZE_LIST - 1, "%s%crwxr-xr-x   1 root users          4096 Nov 22 2009 foo\r\n", 
+                      BUF_SIZE_LIST - 1, "%s%crwxr-xr-x   1 root users %10ld Nov 22 2009 %s\r\n", 
                       output, 
-                      node -> node_type == VFS_DIRECTORY ? 'd' : node -> node_type == VFS_REGULAR_FILE ? '-' : node -> node_type == VFS_SYMLINK ? 'l' : '?',
+                      node -> node_type == VFS_DIRECTORY ? 
+                                'd' : node -> node_type == VFS_REGULAR_FILE ? 
+                                '-' : node -> node_type == VFS_SYMLINK ? 
+                                'l' : '?',
+                      node -> surl != NULL ? 
+                                (long int) node -> surl -> size : (long int) 0,     
                       node -> name);
         }
 
@@ -498,6 +508,10 @@ int VFS_add_TURL_to_SURL (surl_t * surl, turl_t * turl)
     {
         surl -> turl_list = turl;
         surl -> nlink++;
+
+        /* Adding TURL information of the first TURL to the SURL concentrator struct */
+        surl -> size = surl -> turl_list -> size;
+
         return 0;
     }
     else

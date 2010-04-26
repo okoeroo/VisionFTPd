@@ -32,7 +32,7 @@ MAH = -m
 
 BIN   =  ./bin/visionftpd
 #CHROOT = /tmp/
-CHROOT = /Users/okoeroo/dvl/clib/
+CHROOT = /Users/okoeroo/dvl/clib/visionftpd
 
 OBJS  = \
 	src/logging/scar_log.o \

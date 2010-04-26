@@ -1,6 +1,16 @@
 #ifndef INDEX_DATAMODEL_H
     #define INDEX_DATAMODEL_H
 
+#include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+
+/* User/Group information */
+#define v_uid_t uid_t
+#define v_gid_t gid_t
+
+
 /* File Hash */
 typedef struct filehash_s {
     char * method;
@@ -66,6 +76,10 @@ typedef struct turl_list_s {
 
 /* Storage URL - 1 file can be accesible at multiple TURLs */
 typedef struct surl_s {
+    mode_t            mode;            /* protection */
+    v_uid_t           uid;             /* user ID of owner in VFS */
+    v_gid_t           gid;             /* group ID of owner in VFS */
+    off_t             size;            /* total size, in bytes */
     nlink_t           nlink;         /* Number of available TURL links */
     turl_t *          turl_list;     /* List of TURLs to access a file from a Data-Mover */
     int               use_counter;   /* Usage counter to signal hot files */
@@ -88,7 +102,7 @@ typedef struct vfs_s {
     char *           name;        /* Logical (File) Name in the VFS */
     surl_t        *  surl;        /* The Storage URL - Only used for vfs_node_t VFS_REGULAR_FILE */
     struct vfs_s  *  dir_list;    /* Next VFS node in directory */
-    struct vfs_s  *  in_dir;      /* First entry in the directory */
+    struct vfs_s  *  in_dir;      /* First entry in the directory - use this to dive into a directory */
     struct vfs_s  *  symlink;     /* Symlink to other VFS node */
 } vfs_t;
 
