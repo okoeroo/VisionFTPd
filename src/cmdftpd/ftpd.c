@@ -792,7 +792,7 @@ int handle_ftp_STAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         /* Handle stat */
         if (!ftp_state)
         {
-            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 File does not exist");
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 Unrecoverable error!\r\n");
         }
 
         stat_info = malloc (sizeof (unsigned char) * PATH_MAX);
@@ -826,7 +826,7 @@ int handle_ftp_STAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             }
             else
             {
-                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 File does not exist");
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "550 Directory is empty.\r\n");
             }
         }
         

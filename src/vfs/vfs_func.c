@@ -202,48 +202,52 @@ char * VFS_list_by_full_path (vfs_t * vfs_node)
     }
 
 
-    /* Output of STAT */
-    output = malloc (sizeof (char) * BUF_SIZE_LIST);
-    output[0] = '\0'; /* Safety measure */
-
     /* Set start */
     node = vfs_node;
 
     /* Walk the Dir */
-    if (vfs_node -> node_type == VFS_DIRECTORY)
+    if (node && node -> node_type == VFS_DIRECTORY)
     {
-        /* Starting part of the STAT return message */
-        snprintf (output, BUF_SIZE_LIST - 1, "211- status of %s:\r\n", node -> name); 
-
         /* Step into directory */
         node = node -> in_dir;
 
-        /* Cycle this directory */
-        do
+        /* Do I have any file in the directory? - if not, don't return data */
+        if (node)
         {
-            if (!node)
-                break;
+            /* Output of STAT */
+            output = malloc (sizeof (char) * BUF_SIZE_LIST);
+            output[0] = '\0'; /* Safety measure */
 
-            if (node -> name)
+            /* Starting part of the STAT return message */
+            snprintf (output, BUF_SIZE_LIST - 1, "211- status of %s:\r\n", node -> name); 
+
+            /* Cycle this directory */
+            do
             {
-                snprintf (output,
-                          BUF_SIZE_LIST - 1, "%s%crwxr-xr-x %u ftp ftp %10ld Nov 22 2009 %s\r\n", 
-                          output, 
-                          node -> node_type == VFS_DIRECTORY ? 'd' : 
-                              node -> node_type == VFS_REGULAR_FILE ? '-' : 
-                                   node -> node_type == VFS_SYMLINK ? 'l' : '?',
-                          node -> surl -> nlink,
-                          node -> surl != NULL ? 
-                                    (long int) node -> surl -> size : (long int) 0,     
-                          node -> name);
+                if (!node)
+                    break;
+
+                if (node -> name)
+                {
+                    snprintf (output,
+                              BUF_SIZE_LIST - 1, "%s%crwxr-xr-x %u ftp ftp %10ld Nov 22 2009 %s\r\n", 
+                              output, 
+                              node -> node_type == VFS_DIRECTORY ? 'd' : 
+                                  node -> node_type == VFS_REGULAR_FILE ? '-' : 
+                                       node -> node_type == VFS_SYMLINK ? 'l' : '?',
+                              node -> surl -> nlink,
+                              node -> surl != NULL ? 
+                                        (long int) node -> surl -> size : (long int) 0,     
+                              node -> name);
+                }
+
+                node = node -> dir_list;
             }
+            while (node);
 
-            node = node -> dir_list;
+            /* Finalizing list output for STAT output */
+            snprintf (output, BUF_SIZE_LIST - 1, "%s211 End of status\r\n", output);
         }
-        while (node);
-
-        /* Finalizing list output for STAT output */
-        snprintf (output, BUF_SIZE_LIST - 1, "%s211 End of status\r\n", output);
     }
 
     return output;
