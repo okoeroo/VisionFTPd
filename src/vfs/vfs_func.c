@@ -71,7 +71,7 @@ vfs_t * VFS_path_exists (vfs_t * node, char * path)
             tmp_path = &tmp_path[1];
 
             /* Dive into the next directory */
-            return VFS_change_dir (my_node, tmp_path);
+            return VFS_traverse_and_fetch_vfs_node_by_path (my_node, tmp_path);
         }
         else
         {
@@ -87,124 +87,164 @@ vfs_t * VFS_path_exists (vfs_t * node, char * path)
 
 
 
-vfs_t * VFS_change_dir (vfs_t * current, char * path)
+vfs_t * VFS_traverse_and_fetch_vfs_node_by_path (vfs_t * current, char * path)
 {
     char *  tmp_path    = NULL;
-    char *  a_dir       = NULL;
+    char *  a_path_element       = NULL;
     int     len         = 0;
-    vfs_t * changed_dir = NULL;
-
 
     /* Input check */
     if ((path == NULL) || (current == NULL))
     {
+        scar_log (1, "%s: Error: No VFS node or path provided.\n", __func__);
         return NULL; /* No such file or directory */
     }
 
-    /* Search for a '/' and 
-       count amount of characters for the first directory 
-       in the path */
-    if ((tmp_path = strchr(path, '/')) == NULL)
+    /* Empty string or fubar string */
+    if (strlen (path) < 1)
     {
-        len = strlen(path) - strlen(tmp_path);
+        scar_log (5, "%s: DEBUG: Empty string\n", __func__);
+        return NULL;
     }
+
+    scar_log (5, "%s: DEBUG: Path is now: %s\n", __func__, path);
+
+    /* Simple Parsing */
+    /* Specified from root - and only the root is given, return the root */
+    if ((path[0] == '/') && (strlen(path) == 1))
+    {
+        /* Done */
+        scar_log (5, "%s: DEBUG: detected root - and only the root\n", __func__);
+        return current;
+    }
+    /* If you start with the root, but there is more */
+    else if (path[0] == '/')
+    {
+        /* Step into root dir */
+        scar_log (5, "%s: DEBUG: detected root - and more... stepping into directory.\n", __func__);
+        return VFS_traverse_and_fetch_vfs_node_by_path (current -> in_dir, &path[1]);
+    }
+    /* Walk this directory listing to match the string until EOL or the first slash */
     else
     {
-        len = strlen(path);
-    }
-
-
-    /* Working with the directory */
-    a_dir = malloc (sizeof (char) * (len + 1));
-
-    /* Getting the directory */
-    strncpy (a_dir, path, len);
-
-    /* search at VFS node 'current' for a_dir */
-
-    /* Clear temp data */
-    free(a_dir);
-
-
-    /* If there was a '/' found in path, then advance the tmp_path beyond the slash or we're done */
-    if (tmp_path)
-    {
-        /* Test for: mydir/ */
-        if (tmp_path[1] != '\0')
+        scar_log (5, "%s: DEBUG: Walk this directory listing to match the string until EOL or the first slash\n", __func__);
+        /* Search for a '/' and 
+           count amount of characters for the first directory 
+           in the path */
+        if ((tmp_path = strchr(path, '/')) != NULL)
         {
-            tmp_path = &tmp_path[1];
-
-            /* Dive into the next directory */
-            return VFS_change_dir (current, tmp_path);
+            len = strlen(path) - strlen(tmp_path);
         }
         else
         {
-            /* Or done */
-            return changed_dir;
+            len = strlen(path);
         }
-    }
-    else
-    {
-        return changed_dir;
+
+        /* Allocate mem - remove after match or no match */
+        a_path_element = malloc (sizeof (char) * (len + 1));
+
+        /* Getting the directory */
+        strncpy (a_path_element, path, len);
+
+        while (current)
+        {
+            scar_log (5, "DEBUG: current -> name (%s), a_path_element (%s)\n", current -> name, a_path_element);
+
+            /* search at VFS node 'current' for a_path_element */
+            if (strcmp(current -> name, a_path_element) == 0)
+            {
+                /* Found */
+                if (strlen(path) - strlen(a_path_element) != 0)
+                {
+                    /* Clear temp data */
+                    free(a_path_element);
+
+                    /* Step into dir */
+                    return VFS_traverse_and_fetch_vfs_node_by_path (current -> in_dir, &path[strlen(current -> name) + 1]);
+                }
+                else
+                {
+                    /* Clear temp data */
+                    free(a_path_element);
+
+                    /* Full path traversed, done */
+                    return current;
+                }
+            }
+            else
+            {
+                /* Try to match next entry in directory */
+                current = current -> dir_list;
+            }
+        }
+
+        /* Clear temp data */
+        free(a_path_element);
+
+        /* Element not found, must bail-out */
+        scar_log (5, "%s: DEBUG: Element not found!\n", __func__);
+        return NULL;
     }
 }
 
 
-/* Return file list by searching the VFS on a given path */
-char * VFS_list_by_full_path (vfs_t * root, char * path)
+
+/* Return directory listing of vfs_t vfs_node */
+char * VFS_list_by_full_path (vfs_t * vfs_node)
 {
     vfs_t * node = NULL;
     char * output = NULL;
 
-    if (path == NULL)
-    {
-        scar_log (1, "%s: Error: No path provided.\n", __func__);
-        return NULL;
-    }
-    if (root == NULL)
+    if (vfs_node == NULL)
     {
         scar_log (1, "%s: Error: No VFS object provided.\n", __func__);
         return NULL;
     }
 
+
     /* Output of STAT */
     output = malloc (sizeof (char) * BUF_SIZE_LIST);
+    output[0] = '\0'; /* Safety measure */
 
     /* Set start */
-    node = root;
+    node = vfs_node;
 
-    /* Starting part of the STAT return message */
-    snprintf (output, BUF_SIZE_LIST - 1, "211- status of %s:\r\n", node -> name); 
-
-    /* Step into directory */
-    node = node -> in_dir;
-
-    /* Cycle this directory */
-    do
+    /* Walk the Dir */
+    if (vfs_node -> node_type == VFS_DIRECTORY)
     {
-        if (!node)
-            break;
+        /* Starting part of the STAT return message */
+        snprintf (output, BUF_SIZE_LIST - 1, "211- status of %s:\r\n", node -> name); 
 
-        if (node -> name)
+        /* Step into directory */
+        node = node -> in_dir;
+
+        /* Cycle this directory */
+        do
         {
-            snprintf (output,
-                      BUF_SIZE_LIST - 1, "%s%crwxr-xr-x %u ftp ftp %10ld Nov 22 2009 %s\r\n", 
-                      output, 
-                      node -> node_type == VFS_DIRECTORY ? 'd' : 
-                          node -> node_type == VFS_REGULAR_FILE ? '-' : 
-                               node -> node_type == VFS_SYMLINK ? 'l' : '?',
-                      node -> surl -> nlink,
-                      node -> surl != NULL ? 
-                                (long int) node -> surl -> size : (long int) 0,     
-                      node -> name);
+            if (!node)
+                break;
+
+            if (node -> name)
+            {
+                snprintf (output,
+                          BUF_SIZE_LIST - 1, "%s%crwxr-xr-x %u ftp ftp %10ld Nov 22 2009 %s\r\n", 
+                          output, 
+                          node -> node_type == VFS_DIRECTORY ? 'd' : 
+                              node -> node_type == VFS_REGULAR_FILE ? '-' : 
+                                   node -> node_type == VFS_SYMLINK ? 'l' : '?',
+                          node -> surl -> nlink,
+                          node -> surl != NULL ? 
+                                    (long int) node -> surl -> size : (long int) 0,     
+                          node -> name);
+            }
+
+            node = node -> dir_list;
         }
+        while (node);
 
-        node = node -> dir_list;
+        /* Finalizing list output for STAT output */
+        snprintf (output, BUF_SIZE_LIST - 1, "%s211 End of status\r\n", output);
     }
-    while (node);
-
-    /* Finalizing list output for STAT output */
-    snprintf (output, BUF_SIZE_LIST - 1, "%s211 End of status\r\n", output);
 
     return output;
 }

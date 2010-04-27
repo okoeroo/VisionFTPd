@@ -414,7 +414,7 @@ int handle_ftp_CWD  (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         move_bytes_commited_to_next_command (read_buffer_state);
 
         /* Will need integration with the VFS */
-        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "250 \"/\" is current directory\r\n");
+        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "250 Directory successfully changed\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
             /* Buffer overrun */
@@ -778,6 +778,9 @@ int handle_ftp_STAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     const char *        cmd_trigger     = "STAT";
     unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
     char *              output          = NULL;
+    vfs_t *             stated_node     = NULL;
+    unsigned char *     stat_info       = NULL;
+    char                fmt_str[256];
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
@@ -787,19 +790,46 @@ int handle_ftp_STAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     else
     {
         /* Handle stat */
-        if (ftp_state && 
-            (output = VFS_list_by_full_path (ftp_state -> vfs_root, "/")))
-        {
-            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s", output);
-
-            /* Must free output */
-            free(output);
-        }
-        else
+        if (!ftp_state)
         {
             write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 File does not exist");
         }
 
+        stat_info = malloc (sizeof (unsigned char) * PATH_MAX);
+
+        /* Building a dynamic format string, based on the PATH_MAX information */
+        snprintf (fmt_str, sizeof(fmt_str) - 1, "STAT %%%ds*s", PATH_MAX);
+        if (sscanf ((char *) read_buffer_state -> buffer, fmt_str, (char *) stat_info) <= 0)
+        {
+            /* No match */
+            free(stat_info);
+            return NET_RC_UNHANDLED;
+        }
+        else
+        {
+            /* Search vfs_t * from STAT <path> */
+            stated_node = ftp_state -> vfs_root;
+
+            /* Move tmp VFS node to that what is given in STAT call */
+            stated_node = VFS_traverse_and_fetch_vfs_node_by_path (stated_node, (char *) stat_info);
+
+            /* Not needed any more */
+            free(stat_info);
+
+            /* Fetch output based on path */
+            if ((output = VFS_list_by_full_path (stated_node)))
+            {
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s", output);
+
+                /* Must free output */
+                free(output);
+            }
+            else
+            {
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 File does not exist");
+            }
+        }
+        
 
         /* Move commited bytes to next command in the buffer (if there) */
         move_bytes_commited_to_next_command (read_buffer_state);
