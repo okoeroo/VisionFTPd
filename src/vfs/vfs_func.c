@@ -188,12 +188,12 @@ char * VFS_list_by_full_path (vfs_t * root, char * path)
         if (node -> name)
         {
             snprintf (output,
-                      BUF_SIZE_LIST - 1, "%s%crwxr-xr-x   1 root users %10ld Nov 22 2009 %s\r\n", 
+                      BUF_SIZE_LIST - 1, "%s%crwxr-xr-x %u ftp ftp %10ld Nov 22 2009 %s\r\n", 
                       output, 
-                      node -> node_type == VFS_DIRECTORY ? 
-                                'd' : node -> node_type == VFS_REGULAR_FILE ? 
-                                '-' : node -> node_type == VFS_SYMLINK ? 
-                                'l' : '?',
+                      node -> node_type == VFS_DIRECTORY ? 'd' : 
+                          node -> node_type == VFS_REGULAR_FILE ? '-' : 
+                               node -> node_type == VFS_SYMLINK ? 'l' : '?',
+                      node -> surl -> nlink,
                       node -> surl != NULL ? 
                                 (long int) node -> surl -> size : (long int) 0,     
                       node -> name);
