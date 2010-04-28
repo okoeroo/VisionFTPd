@@ -42,7 +42,8 @@ typedef struct file_transfer_s {
 
 typedef struct ftp_data_channel_s {
     int               data_sock;
-    buffer_state_t    data;
+    unsigned char *   data;
+    buffer_state_t *  data_buf;
 
     struct sockaddr * dest_addr;
     socklen_t         dest_len;
@@ -62,6 +63,9 @@ typedef struct ftp_state_s {
     vfs_t *vfs_root;
 } ftp_state_t;
 
+
+buffer_state_t * create_buffer_state (int buffersize);
+ftp_data_channel_t * create_ftp_data_channel (int data_sock, unsigned char * data);
 
 
 void * startFTPCallbckThread (void * arg);

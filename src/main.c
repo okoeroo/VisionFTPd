@@ -11,6 +11,8 @@
 #include "commander.h"
 #include "vfs.h"
 
+#include <signal.h>
+
 
 /* Main */
 int main (int argc, char * argv[])
@@ -26,6 +28,8 @@ int main (int argc, char * argv[])
     pthread_attr_t        attr;
     size_t                stacksize             = 0;
 
+
+    signal (SIGPIPE, SIG_IGN);
 
     scar_set_log_line_prefix ("VisionFTPd");
     scar_log_open (NULL, NULL, DO_ERRLOG);
