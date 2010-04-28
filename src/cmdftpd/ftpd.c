@@ -26,6 +26,56 @@ static char * ftp_service_banner = NULL;
 ****************************************************************************************************/
 
 
+buffer_state_t * create_buffer_state (int buffersize)
+{
+    buffer_state_t * bs = NULL;
+}
+
+
+ftp_data_channel_t * create_ftp_data_channel (int data_sock, unsigned char * data)
+{
+    ftp_data_channel_t * data_channel = NULL;
+
+    /* Default initializing should be with '-1' and 'NULL' */
+
+
+    data_channel = malloc (sizeof (ftp_data_channel_t));
+    if (data_channel ==  NULL)
+        return NULL;
+
+
+    data_channel -> data_sock = data_sock;
+
+
+
+    return data_channel;
+}
+
+
+typedef struct ftp_data_channel_s {
+    int               data_sock;
+    buffer_state_t    data;
+
+    struct sockaddr * dest_addr;
+    socklen_t         dest_len;
+    unsigned short    port;
+} ftp_data_channel_t;
+
+typedef struct ftp_state_s {
+    int init;
+    ftp_mode_t       mode;
+    unsigned char * ftp_user;
+    unsigned char * ftp_passwd;
+    unsigned char * cwd;
+    vfs_t *         vfs_cwd;
+
+    ftp_data_channel_t * data_channel;
+    file_transfer_t *    in_transfer;
+    vfs_t *vfs_root;
+} ftp_state_t;
+
+
+
 void * startFTPCallbckThread (void * arg)
 {
     return NULL;
@@ -742,16 +792,41 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             PORT_to_host_port (short_host_port, &host, &port);
             if (host != NULL)
             {
-                scar_log (1, "%s: Got PORT information: %s:%d\n", __func__, host, port);
+                scar_log (5, "%s: Got PORT information: %s:%d\n", __func__, host, port);
                 write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
 
                 /* Fire off a connection back to the Client on the given host and port info */
                 s = firstTCPSocketConnectingCorrectly (host, port);
-                scar_log (1, "%s: opened client socket to client. fd is %d\n", __func__, s);
+
+                
+typedef struct ftp_data_channel_s {
+    int               data_sock;
+    buffer_state_t    data;
+
+    struct sockaddr * dest_addr;
+    socklen_t         dest_len;
+    unsigned short    port;
+} ftp_data_channel_t;
+
+typedef struct ftp_state_s {
+    int init;
+    ftp_mode_t       mode;
+    unsigned char * ftp_user;
+    unsigned char * ftp_passwd;
+    unsigned char * cwd;
+    vfs_t *         vfs_cwd;
+
+    ftp_data_channel_t * data_channel;
+    file_transfer_t *    in_transfer;
+    vfs_t *vfs_root;
+} ftp_state_t;
+
+                ftp_state -> data_sock = s;
+                scar_log (5, "%s: opened client socket to client. fd is %d\n", __func__, ftp_state -> data_sock);
             }
             else
             {
-                scar_log (1, "%s: Parse error in PORT information.\n", __func__);
+                scar_log (2, "%s: Parse error in PORT information.\n", __func__);
                 write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "501 Error in IP Address or Port number in PORT message\r\n");
             }
 
@@ -850,6 +925,10 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 {
     const char *        cmd_trigger     = "LIST";
     unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
+    char                fmt_str[256];
+    char *              output          = NULL;
+    char *              listed_info     = NULL;
+    vfs_t *             listed_node     = NULL;
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
@@ -858,10 +937,61 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     }
     else
     {
+        /* Handle stat */
+        if (!ftp_state)
+        {
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 Unrecoverable error!\r\n");
+        }
+
+        listed_info = malloc (sizeof (unsigned char) * PATH_MAX);
+
+        /* Building a dynamic format string, based on the PATH_MAX information */
+        snprintf (fmt_str, sizeof(fmt_str) - 1, "STAT %%%ds*s", PATH_MAX);
+        if (sscanf ((char *) read_buffer_state -> buffer, fmt_str, (char *) listed_info) <= 0)
+        {
+            /* No match */
+            free(listed_info);
+            return NET_RC_UNHANDLED;
+        }
+        else
+        {
+            /* Search vfs_t * from STAT <path> */
+            listed_node = ftp_state -> vfs_root;
+
+            /* Move tmp VFS node to that what is given in STAT call */
+            listed_node = VFS_traverse_and_fetch_vfs_node_by_path (listed_node, (char *) listed_info);
+
+            /* Not needed any more */
+            free(listed_info);
+
+            /* Fetch output based on path */
+            if ((output = VFS_list_by_full_path (listed_node)))
+            {
+                /* Open data port to send bytes */
+                /* Start Data thread */
+
+                /* Must free output */
+                free(output);
+
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "150 Opening ASCII mode data connection for /bin/ls\r\n");
+                if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+                {
+                    /* Buffer overrun */
+                    return NET_RC_DISCONNECT;
+                }
+                else
+                {
+                    return NET_RC_MUST_WRITE;
+                }
+            }
+            else
+            {
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "550 Directory is empty.\r\n");
+            }
+        }
         /* Move commited bytes to next command in the buffer (if there) */
         move_bytes_commited_to_next_command (read_buffer_state);
 
-        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "150 Opening ASCII mode data connection for /bin/ls\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
             /* Buffer overrun */
