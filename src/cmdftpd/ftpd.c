@@ -26,16 +26,6 @@ static char * ftp_service_banner = NULL;
 ****************************************************************************************************/
 
 
-buffer_state_t * create_buffer_state (int buffersize)
-{
-    buffer_state_t * bs = NULL;
-
-    bs = calloc (1, sizeof(buffer_state_t));
-
-    return bs;
-}
-
-
 ftp_data_channel_t * create_ftp_data_channel (int data_sock, unsigned char * data)
 {
     ftp_data_channel_t * data_channel = NULL;
@@ -49,7 +39,7 @@ ftp_data_channel_t * create_ftp_data_channel (int data_sock, unsigned char * dat
 
     data_channel -> data_sock = data_sock;
     data_channel -> data      = data;
-    data_channel -> data_buf  = create_buffer_state (4096);
+    data_channel -> data_buf  = init_buffer_state (4096);
     if (data_channel -> data_buf == NULL)
     {
         free(data_channel);
@@ -428,6 +418,9 @@ int handle_ftp_PWD  (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 int handle_ftp_CWD  (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
 {
     const char * cmd_trigger = "CWD";
+    char         fmt_str[256];
+    vfs_t *      stated_node = NULL;
+    vfs_t *      cwd_to_node = NULL;
 
     if (strncasecmp ((char *) read_buffer_state -> buffer, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
@@ -437,19 +430,40 @@ int handle_ftp_CWD  (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     else
     {
         if (ftp_state -> cwd == NULL)
-            ftp_state -> cwd = malloc (4096 * sizeof(char)); /* 4096 is typically PATH_MAX */
+            ftp_state -> cwd = malloc ((PATH_MAX + 1) * sizeof(char)); /* 4096 is typically PATH_MAX */
 
-        if (sscanf ((char *) read_buffer_state -> buffer, "CWD %4095s\r\n", ftp_state -> cwd) <= 0)
+        bzero (ftp_state -> cwd, PATH_MAX + 1);
+
+        snprintf (fmt_str, sizeof(fmt_str) - 1, "CWD %%%ds*s", PATH_MAX);
+        if (sscanf ((char *) read_buffer_state -> buffer, fmt_str, (char *) ftp_state -> cwd) <= 0)
         {
             /* No match */
             return NET_RC_UNHANDLED;
         }
 
+        /* Search for VFS node to change directory to */
+        stated_node = ftp_state -> vfs_root;
+
+        /* Move tmp VFS node to that what is given in STAT call */
+        cwd_to_node = VFS_traverse_and_fetch_vfs_node_by_path (stated_node, (char *) ftp_state -> cwd);
+
+        if (cwd_to_node != NULL)
+        {
+            /* Update the current working directory */
+            ftp_state -> vfs_cwd = cwd_to_node;
+
+            /* Will need integration with the VFS */
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "250 Directory successfully changed\r\n");
+        }
+        else
+        {
+            /* Directory does not exist */
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 directory does not exist\r\n");
+        }
+
         /* Move commited bytes to next command in the buffer (if there) */
         move_bytes_commited_to_next_command (read_buffer_state);
 
-        /* Will need integration with the VFS */
-        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "250 Directory successfully changed\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
             /* Buffer overrun */
@@ -778,7 +792,7 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             if (host != NULL)
             {
                 scar_log (5, "%s: Got PORT information: %s:%d\n", __func__, host, port);
-                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200 PORT Command succesful\r\n");
 
 
                 /* Fire off a connection back to the Client on the given host and port info */
@@ -803,7 +817,7 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 
 
                         /* Signal FTP data transfer ready */
-                        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s150 Ready for transfer\r\n", (char *) write_buffer_state -> buffer);
+                        /* write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s150 Ready for transfer\r\n", (char *) write_buffer_state -> buffer); */
                     }
                 }
             }
@@ -929,29 +943,24 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         listed_info = malloc (sizeof (unsigned char) * PATH_MAX);
 
         /* Building a dynamic format string, based on the PATH_MAX information */
-        snprintf (fmt_str, sizeof(fmt_str) - 1, "STAT %%%ds*s", PATH_MAX);
-        if (sscanf ((char *) read_buffer_state -> buffer, fmt_str, (char *) listed_info) <= 0)
+        if (strncmp (read_buffer_state -> buffer, cmd_trigger, strlen(cmd_trigger) != 0))
         {
-            /* No match */
-            free(listed_info);
             return NET_RC_UNHANDLED;
         }
         else
         {
-            /* Search vfs_t * from STAT <path> */
-            listed_node = ftp_state -> vfs_root;
-
-            /* Move tmp VFS node to that what is given in STAT call */
-            listed_node = VFS_traverse_and_fetch_vfs_node_by_path (listed_node, (char *) listed_info);
-
-            /* Not needed any more */
-            free(listed_info);
-
             /* Fetch output based on path */
-            if ((output = VFS_list_by_full_path (listed_node)))
+            if ((output = VFS_list_by_full_path (ftp_state -> vfs_cwd)))
             {
                 /* Open data port to send bytes */
                 /* Start Data thread */
+                if ((ftp_state -> data_channel) && (ftp_state -> data_channel -> data_sock >= 0))
+                {
+                    /* HACK */
+                    write (ftp_state -> data_channel -> data_sock, output, strlen(output));
+                    close (ftp_state -> data_channel -> data_sock);
+                    ftp_state -> data_channel -> data_sock = -1;
+                }
 
                 /* Must free output */
                 free(output);
