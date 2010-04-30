@@ -681,7 +681,9 @@ int handle_ftp_LPRT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             move_bytes_commited_to_next_command (read_buffer_state);
 
             parse_long_host_port (long_host_port, &ft);
-            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200\r\n");
+
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 %s doesn't understand command: %s\r\n", APP_NAME, cmd_trigger);
+
             if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
             {
                 /* Buffer overrun */
