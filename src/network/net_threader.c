@@ -45,6 +45,12 @@ int free_buffer_state (buffer_state_t ** buf)
 }
 
 
+void * threadDataChannel (void * arg)
+{
+    
+
+}
+
 
 void * threadingDaemonClientHandler (void * arg)
 {
