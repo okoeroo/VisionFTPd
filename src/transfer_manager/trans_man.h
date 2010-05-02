@@ -3,6 +3,7 @@
 
 #include "vfs.h"
 #include "net_common.h"
+#include "net_threader.h"
 
 
 typedef struct master_node_s {
@@ -28,7 +29,10 @@ typedef struct data_transfers_s {
 } data_transfer_t;
 
 
-void TM_init (int max_con_transfers);
+
+int TM_init (char * master_node,
+             short port,
+             int max_con_transfers);
 void * TM_add (void * args);
 
 

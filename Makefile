@@ -20,6 +20,7 @@ CPPFLAGS = \
 	-Isrc/logging/ \
 	-Iinclude/ \
 	-Isrc/network/ \
+	-Isrc/transfer_manager/ \
 	-Isrc/cmdftpd/ \
 	-Isrc/vfs/ \
 	-I. \
@@ -41,6 +42,7 @@ OBJS  = \
 	src/network/net_server.o \
 	src/network/net_threader.o \
 	src/network/net_messenger.o \
+	src/transfer_manager/trans_man.o \
 	src/unsigned_string.o \
 	src/daemonize.o \
 	src/cmdftpd/ftpd.o \

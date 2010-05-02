@@ -10,8 +10,23 @@
 
 #include "commander.h"
 #include "vfs.h"
+#include "trans_man.h"
 
 #include <signal.h>
+
+int process_type = MASTER;
+
+
+void usage (void)
+{
+    printf ("%s %s\n", APP_NAME, APP_VERSION);
+    printf ("\t--help               : This garbage called \'help\'...\n");
+    printf ("\t--slave              : Starts this process as a Data-move aka Slave. It must register with a Master to be useful\n");
+    printf ("\t--masterhost <arg>   : Requires an argument that specifies a Hostname, IPv4 or IPv6 address to the Master\n");
+    printf ("\t--masterport <arg>   : Requires an argument that specifies the port number to use. The Master must already be listening to this port.\n");
+    printf ("\t--chroot <arg>       : Requires an argument that specifies the root of the data to share through the Virtual File System hosted on the Master, pushed by the Slaves\n");
+    printf ("\n");
+}
 
 
 /* Main */
@@ -21,6 +36,8 @@ int main (int argc, char * argv[])
     pthread_t             cmd_thread;
     commander_options_t * commander_options;
     char *                vision_chroot = NULL;
+    char *                master_node_addr = NULL;
+    short                 master_node_port = -1;
     int                   i = 0;
 
     vfs_t *               vfs_root = NULL;
@@ -31,13 +48,48 @@ int main (int argc, char * argv[])
 
     signal (SIGPIPE, SIG_IGN);
 
-    scar_set_log_line_prefix ("VisionFTPd");
+    scar_set_log_line_prefix (APP_NAME);
     scar_log_open (NULL, NULL, DO_ERRLOG);
 
     
     for (i = 1; i < argc; i++)
     {
-        if (strcasecmp(argv[i], "--chroot") == 0)
+        if ((strcasecmp(argv[i], "--help") == 0) ||
+            (strcasecmp(argv[i], "-help") == 0) ||
+            (strcasecmp(argv[i], "-h") == 0))
+        {
+            usage();
+            return 0;
+        }
+        else if (strcasecmp(argv[i], "--slave") == 0)
+        {
+            process_type = SLAVE;
+        }
+        else if (strcasecmp(argv[i], "--masterhost") == 0)
+        {
+            if ((i + 1) < argc)
+            {
+                master_node_addr = argv[i + 1];
+            }
+            else
+            {
+                scar_log (1, "Failed to supply --masterhost <host/ipv4/ipv6> option\n");
+                return 1;
+            }
+        }
+        else if (strcasecmp(argv[i], "--masterport") == 0)
+        {
+            if ((i + 1) < argc)
+            {
+                master_node_port = strtol (argv[i + 1], NULL, 10);
+            }
+            else
+            {
+                scar_log (1, "Failed to supply --masterport <port> option\n");
+                return 1;
+            }
+        }
+        else if (strcasecmp(argv[i], "--chroot") == 0)
         {
             if ((i + 1) < argc)
             {
@@ -51,13 +103,26 @@ int main (int argc, char * argv[])
         }
     }
 
+    /* Integrity checks */
     if (!vision_chroot)
     {
         scar_log (1, "Failed to supply --chroot <dir> option\n");
         return 1;
     }
 
+    if ((process_type == SLAVE) && (master_node_port == -1))
+    {
+        scar_log (1, "Error: Slaves must have a configured Master port: use --masterport <port>\n");
+        return 1;
+    }
+    if ((process_type == SLAVE) && (master_node_addr == NULL))
+    {
+        scar_log (1, "Error: Slaves must have a configured Master host: use --masterhost <hostname/IPv4/IPv6>\n");
+        return 1;
+    }
 
+
+    /* Upgrade memory boundry of threads */
     pthread_attr_init(&attr);
     pthread_attr_getstacksize (&attr, &stacksize);
     scar_log (1, "Default stack size = %li\n", stacksize);
@@ -65,6 +130,7 @@ int main (int argc, char * argv[])
 
     scar_log (1, "Amount of stack needed per thread = %li\n",stacksize);
     pthread_attr_setstacksize (&attr, stacksize);
+
 
     
     /* vfs_main */
@@ -85,26 +151,40 @@ int main (int argc, char * argv[])
         VFS_print (vfs_root);
     }
 
-
-    /* Start Commander */
-    commander_options = calloc (1, sizeof (commander_options_t));
-    if (commander_options == NULL)
-        scar_log (1, "Out of memory\n");
-
-    commander_options -> port        = 6621;
-    commander_options -> max_clients = 100;
-    commander_options -> ftp_banner  = "VisionFTPd v0.1";
-    commander_options -> vfs_root    = vfs_root;
-
-    /* Fire up the commander */
-    if (0 != pthread_create (&cmd_thread, NULL, startCommander, (void *)(&commander_options)))
+    /* Master process type */
+    if (process_type == MASTER)
     {
-        scar_log (1, "Failed to start FTP Commander thread. Out of memory\n");
-        return 1;
-    }
+        /* Start Commander */
+        commander_options = calloc (1, sizeof (commander_options_t));
+        if (commander_options == NULL)
+            scar_log (1, "Out of memory\n");
 
-    /* Wait for commander thread join */
-    pthread_join (cmd_thread, NULL);
+        commander_options -> port        = 6621;
+        commander_options -> max_clients = 100;
+        commander_options -> ftp_banner  = "VisionFTPd v0.1";
+        commander_options -> vfs_root    = vfs_root;
+
+        /* Fire up the commander */
+        if (0 != pthread_create (&cmd_thread, NULL, startCommander, (void *)(&commander_options)))
+        {
+            scar_log (1, "Failed to start FTP Commander thread. Out of memory\n");
+            return 1;
+        }
+
+        /* Wait for commander thread join */
+        pthread_join (cmd_thread, NULL);
+    }
+    else
+    {
+        if (TM_init (master_node_addr, master_node_port, 10) != 0)
+        {
+            scar_log (1, "Failed to connect to VisionFTPd Master\n");
+
+            /* Easy exit */
+            scar_log_close();
+            return 1;
+        }
+    }
 
 
     /* Easy exit */

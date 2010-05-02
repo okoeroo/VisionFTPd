@@ -27,6 +27,8 @@
 #define APP_NAME "VisionFTPd"
 #define APP_VERSION "0.1"
 
+#define MASTER 1
+#define SLAVE  2
 
 /* This handles the connection retry setting */
 #define ABSOLUTE_TIME_LIMIT_OF_CLIENT_RETRY_IN_SECONDS 1000000 /* 10^6 == 1M seconds ~ 11 days */
@@ -63,6 +65,7 @@
 
 
 
+void usage (void);
 
 void   set_irc_channel (char * channel);
 char * get_irc_channel (void);

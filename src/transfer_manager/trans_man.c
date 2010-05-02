@@ -15,25 +15,26 @@ int TM_init (char * master_node,
 {
     max_concurrent_transfers = max_con_transfers;
 
-    master_node = malloc (sizeof (master_node_t));
-    master_node -> master_node = strdup(master_node);
-    master_node -> port        = port;
-    master_node -> socket      = -1;
-    master_node -> next        = NULL;
+    master_node_t * this_master_node = NULL;
+
+    this_master_node = malloc (sizeof (master_node_t));
+    this_master_node -> master_node = strdup(master_node);
+    this_master_node -> port        = port;
+    this_master_node -> socket      = -1;
+    this_master_node -> next        = NULL;
 
     /* Fire up connection to home base */
-    master_node -> socket = firstTCPSocketConnectingCorrectly (master_node -> master_node, 
-                                                               master_node -> port);
-    if (master_node -> socket < 0)
+    this_master_node -> socket = firstTCPSocketConnectingCorrectly (this_master_node -> master_node, this_master_node -> port);
+    if (this_master_node -> socket < 0)
     {
         scar_log (1, "%s: Error: unable to establish connection to the master node \"%s\" on port \"%d\"\n",
-                     master_node -> master_node,
-                     master_node -> port);
+                     this_master_node -> master_node,
+                     this_master_node -> port);
         return 1;
     }
 
     /* Register master */
-    master_nodes = master_node;
+    master_nodes = this_master_node;
 
     return 0;
 }
@@ -42,17 +43,18 @@ int TM_init (char * master_node,
 
 void * TM_add (void * args)
 {
-    data_transfer_t * dt = args;
+    data_transfer_t * dt = (data_transfer_t *) args;
+    int s = -1;
 
     if (!dt)
         return NULL;
 
 
-    if (dt -> file)
+    /* if (dt -> file) */
     {
 
         /* Fire off a connection back to the Client on the given host and port info */
-        s = firstTCPSocketConnectingCorrectly (host, port);
+        /* s = firstTCPSocketConnectingCorrectly (host, port); */
         if (s < 0)
         {
             /* Failed to open data port */
@@ -60,25 +62,12 @@ void * TM_add (void * args)
         }
         else
         {
-
-
-
-
-        write (ftp_state -> data_channel -> data_sock, output, strlen(output));
-        shutdown (ftp_state -> data_channel -> data_sock, SHUT_RDWR);
-        close (ftp_state -> data_channel -> data_sock);
-        ftp_state -> data_channel -> data_sock = -1;
-
-        msg = net_msg_create (100);
-        msg -> msg -> num_bytes = snprintf ((char *) msg -> msg -> buffer, 
-                                                     msg -> msg -> buffer_size,
-                                                     "226 transfer finished.\r\n");
-        net_msg_push_on_queue (ftp_state -> output_q, msg);
-
-
+        }
 
     }
-    else if (file)
+    /* else */
     {
     }
+
+    return NULL;
 }
