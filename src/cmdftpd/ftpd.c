@@ -944,10 +944,9 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
 {
     const char *        cmd_trigger     = "LIST";
     unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
-    char                fmt_str[256];
     char *              output          = NULL;
     /* char *              listed_info     = NULL; */
-    vfs_t *             listed_node     = NULL;
+    net_msg_t *         msg = NULL;
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
@@ -965,7 +964,7 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         /* listed_info = malloc (sizeof (unsigned char) * PATH_MAX); */
 
         /* Building a dynamic format string, based on the PATH_MAX information */
-        if (strncmp (read_buffer_state -> buffer, cmd_trigger, strlen(cmd_trigger) != 0))
+        if (strncmp ((char *) read_buffer_state -> buffer, cmd_trigger, strlen(cmd_trigger) != 0))
         {
             return NET_RC_UNHANDLED;
         }
@@ -986,12 +985,18 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                     shutdown (ftp_state -> data_channel -> data_sock, SHUT_RDWR);
                     close (ftp_state -> data_channel -> data_sock);
                     ftp_state -> data_channel -> data_sock = -1;
+
+                    msg = net_msg_create (100);
+                    msg -> msg -> num_bytes = snprintf ((char *) msg -> msg -> buffer, 
+                                                                 msg -> msg -> buffer_size,
+                                                                 "226 transfer finished.\r\n");
+                    net_msg_push_on_queue (ftp_state -> output_q, msg);
                 }
 
                 /* Must free output */
                 free(output);
 
-                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "150 Opening ASCII mode data connection for /bin/ls\r\n226 transfer finished.\r\n");
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "150 Opening ASCII mode data connection for /bin/ls\r\n");
                 if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
                 {
                     /* Buffer overrun */

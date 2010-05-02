@@ -14,6 +14,7 @@
 
 #include "main.h"
 #include "net_threader.h"
+#include "net_messenger.h"
 #include "vfs.h"
 
 
@@ -57,6 +58,9 @@ typedef struct ftp_state_s {
     unsigned char * ftp_passwd;
     unsigned char * cwd;
     vfs_t *         vfs_cwd;
+
+    net_msg_queue_t * input_q;
+    net_msg_queue_t * output_q;
 
     ftp_data_channel_t * data_channel;
     file_transfer_t *    in_transfer;

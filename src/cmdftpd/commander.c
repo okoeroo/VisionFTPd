@@ -8,6 +8,7 @@
 #include "commander.h"
 
 #include "net_threader.h"
+#include "net_messenger.h"
 #include "unsigned_string.h"
 
 #include "ftpd.h"
@@ -139,6 +140,8 @@ int commander_idle_io (buffer_state_t * write_buffer_state, void ** state)
 {
     ftp_state_t * ftp_state = *(ftp_state_t **)state;
     int rc                  = NET_RC_IDLE;
+    net_msg_t * msg_to_send = NULL;
+
 
     /* FTP connection state initialization */
     if (ftp_state == NULL)
@@ -152,6 +155,29 @@ int commander_idle_io (buffer_state_t * write_buffer_state, void ** state)
     if (ftp_state -> init == 0)
     {
         rc = handle_ftp_initialization (ftp_state, NULL, write_buffer_state);
+        goto finalize_message_handling;
+    }
+
+
+    /* Handle message queue */
+    if ((msg_to_send = net_msg_pop_on_queue (ftp_state -> output_q)))
+    {
+        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, 
+                                                    write_buffer_state -> buffer_size,
+                                                    "%s",
+                                                    msg_to_send -> msg -> buffer);
+        /* Remove popped message */
+        net_msg_delete_list (&msg_to_send);
+
+        /* Buffer overrun */ 
+        if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+        {
+            rc = NET_RC_DISCONNECT;
+        }
+        else
+        {
+            rc = NET_RC_MUST_WRITE;
+        }
         goto finalize_message_handling;
     }
 
@@ -176,6 +202,9 @@ int commander_state_liberator (void ** state)
         ftp_state -> ftp_passwd = NULL;
         free(ftp_state -> cwd);
         ftp_state -> cwd        = NULL;
+
+        net_msg_queue_delete (&(ftp_state -> input_q));
+        net_msg_queue_delete (&(ftp_state -> output_q));
 
         while (ftp_state -> in_transfer)
         {
@@ -229,6 +258,9 @@ int commander_state_initiator (void ** state, void * vfs)
         ftp_state -> in_transfer = NULL;
 
         ftp_state -> vfs_root    = (vfs_t *) vfs;
+
+        ftp_state -> input_q  = net_msg_queue_create();
+        ftp_state -> output_q = net_msg_queue_create();
 
         /* DEBUG */
         /* VFS_print (ftp_state -> vfs_root); */
