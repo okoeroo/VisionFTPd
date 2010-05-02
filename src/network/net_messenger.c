@@ -82,6 +82,7 @@ int delete_net_msg_queue (net_msg_queue_t ** q)
         delete_net_msg_list (&(del_q -> in_process));
         delete_net_msg_list (&(del_q -> on_queue));
 
+        pthread_mutex_unlock (&(del_q -> lock));
         pthread_mutex_destroy (&(del_q -> lock));
        
         free(del_q);
