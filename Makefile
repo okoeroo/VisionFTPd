@@ -40,6 +40,7 @@ OBJS  = \
 	src/network/net_client.o \
 	src/network/net_server.o \
 	src/network/net_threader.o \
+	src/network/net_messenger.o \
 	src/unsigned_string.o \
 	src/daemonize.o \
 	src/cmdftpd/ftpd.o \

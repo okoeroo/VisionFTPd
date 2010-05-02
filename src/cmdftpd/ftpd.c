@@ -154,6 +154,7 @@ int PORT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * po
 {
     unsigned int a1, a2, a3, a4, p1, p2;
 
+/*
     if (sscanf((char *)str, "%u,%u,%u,%u,%u,%u",
                 &a1, &a2, &a3, &a4, &p1, &p2) != 6 ||
             a1 > 255 || a2 > 255 || a3 > 255 || a4 > 255 ||
@@ -161,10 +162,29 @@ int PORT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * po
             (p1 | p2) == 0) {
         return 501;     
     }           
+    */
+    if (sscanf((char *)str, "%u,%u,%u,%u,%u,%u",
+                &a1, &a2, &a3, &a4, &p1, &p2) != 6 ||
+            a1 > 255 || a2 > 255 || a3 > 255 || a4 > 255 ||
+            p1 > 255 || p2 > 255 ||
+            (p1 | p2) == 0) {
+        return 501;     
+    }           
         /* htonl((a1 << 24) | (a2 << 16) | (a3 << 8) | a4); */
 
     *port = (p1 << 8) | p2;
     *host_ip = malloc (sizeof (char) * 16);
+
+    /* LeechFTP hack - To/from localhost, advertising PORT, followed by LIST, the return address is 0.0.0.0 with a valid port nummer. */
+    /* Solution: treat 0.0.0.0 as 127.0.0.1 */
+    if ((a1|a2|a3|a4) == 0)
+    {
+        a1 = 127;
+        a2 = 0;
+        a3 = 0;
+        a4 = 1;
+    }
+
     snprintf (*host_ip, 15, "%d.%d.%d.%d", a1, a2, a3, a4);
 
     return 200;
@@ -374,7 +394,7 @@ int handle_ftp_FEAT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         /* Move commited bytes to next command in the buffer (if there) */
         move_bytes_commited_to_next_command (read_buffer_state);
 
-        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "211- Extensions supported:\r\n SIZE\r\n REST STREAM\r\n211 END\r\n");
+        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "211- Extensions supported:\r\n PORT\r\n SIZE\r\n REST STREAM\r\n211 END\r\n");
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
         {
             /* Buffer overrun */
@@ -926,7 +946,7 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     unsigned char *     bufp            = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
     char                fmt_str[256];
     char *              output          = NULL;
-    char *              listed_info     = NULL;
+    /* char *              listed_info     = NULL; */
     vfs_t *             listed_node     = NULL;
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
@@ -942,7 +962,7 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "500 Unrecoverable error!\r\n");
         }
 
-        listed_info = malloc (sizeof (unsigned char) * PATH_MAX);
+        /* listed_info = malloc (sizeof (unsigned char) * PATH_MAX); */
 
         /* Building a dynamic format string, based on the PATH_MAX information */
         if (strncmp (read_buffer_state -> buffer, cmd_trigger, strlen(cmd_trigger) != 0))
@@ -952,6 +972,9 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
         else
         {
             /* Fetch output based on path */
+            if (ftp_state -> vfs_cwd == NULL)
+                ftp_state -> vfs_cwd = ftp_state -> vfs_root;
+
             if ((output = VFS_list_by_full_path (ftp_state -> vfs_cwd)))
             {
                 /* Open data port to send bytes */
@@ -960,6 +983,7 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                 {
                     /* HACK */
                     write (ftp_state -> data_channel -> data_sock, output, strlen(output));
+                    shutdown (ftp_state -> data_channel -> data_sock, SHUT_RDWR);
                     close (ftp_state -> data_channel -> data_sock);
                     ftp_state -> data_channel -> data_sock = -1;
                 }
@@ -967,7 +991,7 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                 /* Must free output */
                 free(output);
 
-                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "150 Opening ASCII mode data connection for /bin/ls\r\n");
+                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "150 Opening ASCII mode data connection for /bin/ls\r\n226 transfer finished.\r\n");
                 if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
                 {
                     /* Buffer overrun */
