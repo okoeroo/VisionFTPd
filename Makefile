@@ -21,6 +21,7 @@ CPPFLAGS = \
 	-Iinclude/ \
 	-Isrc/network/ \
 	-Isrc/transfer_manager/ \
+	-Isrc/grandcentral/ \
 	-Isrc/cmdftpd/ \
 	-Isrc/vfs/ \
 	-I. \
@@ -45,6 +46,7 @@ OBJS  = \
 	src/transfer_manager/trans_man.o \
 	src/unsigned_string.o \
 	src/daemonize.o \
+	src/grandcentral/dispatcher.o \
 	src/cmdftpd/ftpd.o \
 	src/cmdftpd/commander.o \
 	src/irandom.o \

@@ -7,9 +7,9 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-
-#include "commander.h"
 #include "vfs.h"
+#include "commander.h"
+#include "dispatcher.h"
 #include "trans_man.h"
 
 #include <signal.h>
@@ -34,7 +34,9 @@ int main (int argc, char * argv[])
 {
     pthread_t             vfs_thread;
     pthread_t             cmd_thread;
-    commander_options_t * commander_options;
+    pthread_t             dispatcher_thread;
+    commander_options_t * commander_options = NULL;
+    dispatcher_options_t * dispatcher_options = NULL;
     char *                vision_chroot = NULL;
     char *                master_node_addr = NULL;
     short                 master_node_port = -1;
@@ -154,6 +156,22 @@ int main (int argc, char * argv[])
     /* Master process type */
     if (process_type == MASTER)
     {
+        /* Start Dispatcher */
+        dispatcher_options = calloc (1, sizeof (dispatcher_options_t));
+        if (dispatcher_options == NULL)
+            scar_log (1, "Out of memory\n");
+
+        dispatcher_options -> port        = 6666;
+        dispatcher_options -> max_clients = 100;
+        dispatcher_options -> vfs_root    = vfs_root;
+
+        /* Fire up the dispatcher */
+        if (0 != pthread_create (&dispatcher_thread, NULL, startdispatcher , (void *)(&dispatcher_options)))
+        {
+            scar_log (1, "Failed to start FTP Commander thread. Out of memory\n");
+            return 1;
+        }
+
         /* Start Commander */
         commander_options = calloc (1, sizeof (commander_options_t));
         if (commander_options == NULL)
