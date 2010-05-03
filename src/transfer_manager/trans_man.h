@@ -4,12 +4,17 @@
 #include "vfs.h"
 #include "net_common.h"
 #include "net_threader.h"
+#include "net_messenger.h"
 
 
 typedef struct master_node_s {
+    pthread_t tid;
     char * master_node;
     short  port;
     int    socket;
+    net_msg_queue_t * input_q;
+    net_msg_queue_t * output_q;
+
     struct master_node_s * next;
 } master_node_t;
 
@@ -30,10 +35,11 @@ typedef struct data_transfers_s {
 
 
 
-int TM_init (char * master_node,
+int TM_init (master_node_t ** master_nodes,
+             char * master_node,
              short port,
              int max_con_transfers);
-void * TM_add (void * args);
+void * slave_comm_to_master (void * args);
 
 
 #endif /* TRANS_MAN_H */

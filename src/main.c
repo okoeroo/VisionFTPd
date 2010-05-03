@@ -32,20 +32,22 @@ void usage (void)
 /* Main */
 int main (int argc, char * argv[])
 {
-    pthread_t             vfs_thread;
-    pthread_t             cmd_thread;
-    pthread_t             dispatcher_thread;
-    commander_options_t * commander_options = NULL;
-    dispatcher_options_t * dispatcher_options = NULL;
-    char *                vision_chroot = NULL;
-    char *                master_node_addr = NULL;
-    short                 master_node_port = -1;
-    int                   i = 0;
+    pthread_t                 vfs_thread;
+    pthread_t                 cmd_thread;
+    pthread_t                 dispatcher_thread;
+    commander_options_t *     commander_options = NULL;
+    dispatcher_options_t *    dispatcher_options = NULL;
+    master_node_t *           master_nodes = NULL;
+    master_node_t *           tmp_master_nodes = NULL;
+    char *                    vision_chroot = NULL;
+    char *                    master_node_addr = NULL;
+    short                     master_node_port = -1;
+    int                       i = 0;
 
-    vfs_t *               vfs_root = NULL;
+    vfs_t *                   vfs_root = NULL;
 
-    pthread_attr_t        attr;
-    size_t                stacksize             = 0;
+    pthread_attr_t            attr;
+    size_t                    stacksize             = 0;
 
 
     signal (SIGPIPE, SIG_IGN);
@@ -194,7 +196,8 @@ int main (int argc, char * argv[])
     }
     else
     {
-        if (TM_init (master_node_addr, master_node_port, 10) != 0)
+        /* Initialize a master */
+        if (TM_init (&master_nodes, master_node_addr, master_node_port, 10) != 0)
         {
             scar_log (1, "Failed to connect to VisionFTPd Master\n");
 
@@ -202,8 +205,35 @@ int main (int argc, char * argv[])
             scar_log_close();
             return 1;
         }
-    }
 
+        /* Connection to Master nodes for instructions */
+        tmp_master_nodes = master_nodes;
+        while (tmp_master_nodes)
+        {
+            if (0 != pthread_create (&(tmp_master_nodes -> tid), 
+                                     NULL, 
+                                     slave_comm_to_master, 
+                                     (void *)tmp_master_nodes))
+            {
+                scar_log (1, "Failed to submit to Master node. Out of memory\n");
+            }
+            /* Bow to next Master */
+            tmp_master_nodes = tmp_master_nodes -> next;
+        }
+        
+        /* Await release from Masters bidding */
+        tmp_master_nodes = master_nodes;
+        while (tmp_master_nodes)
+        {
+            if (0 != pthread_join (tmp_master_nodes -> tid,
+                                   NULL))
+            {
+                scar_log (1, "Failed to submit to Master node. Out of memory\n");
+            }
+            /* Bow to next Master */
+            tmp_master_nodes = tmp_master_nodes -> next;
+        }
+    }
 
     /* Easy exit */
     scar_log_close();
