@@ -25,6 +25,7 @@ void usage (void)
     printf ("\t--masterhost <arg>   : Requires an argument that specifies a Hostname, IPv4 or IPv6 address to the Master\n");
     printf ("\t--masterport <arg>   : Requires an argument that specifies the port number to use. The Master must already be listening to this port.\n");
     printf ("\t--chroot <arg>       : Requires an argument that specifies the root of the data to share through the Virtual File System hosted on the Master, pushed by the Slaves\n");
+    printf ("\t--password <arg>     : Password used to authenticate the Master and the Slaves. Only when the keys are the same, the Master is trusted\n");
     printf ("\n");
 }
 
@@ -39,6 +40,7 @@ int main (int argc, char * argv[])
     dispatcher_options_t *    dispatcher_options = NULL;
     master_node_t *           master_nodes = NULL;
     master_node_t *           tmp_master_nodes = NULL;
+    char *                    password = NULL;
     char *                    vision_chroot = NULL;
     char *                    master_node_addr = NULL;
     short                     master_node_port = -1;
@@ -64,6 +66,18 @@ int main (int argc, char * argv[])
         {
             usage();
             return 0;
+        }
+        else if (strcasecmp(argv[i], "--password") == 0)
+        {
+            if ((i + 1) < argc)
+            {
+                password = argv[i + 1];
+            }
+            else
+            {
+                scar_log (1, "Failed to supply --password <secret> option\n");
+                return 1;
+            }
         }
         else if (strcasecmp(argv[i], "--slave") == 0)
         {
