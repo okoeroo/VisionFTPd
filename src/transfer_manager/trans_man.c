@@ -135,7 +135,6 @@ void * slave_comm_to_master (void * args)
         else
         {
             /* Re-use of code FTW! */
-            threadingDaemonClientHandler (&net_thread_pool_node);
             rc = pthread_create(&(net_thread_pool_node -> threadid), NULL, threadingDaemonClientHandler, (void*)(&net_thread_pool_node));
             if (rc != 0)
             {
