@@ -45,13 +45,6 @@ int free_buffer_state (buffer_state_t ** buf)
 }
 
 
-void * threadDataChannel (void * arg)
-{
-    
-
-}
-
-
 void * threadingDaemonClientHandler (void * arg)
 {
     net_thread_pool_t *     net_thread_pool_node = *(net_thread_pool_t **)arg;

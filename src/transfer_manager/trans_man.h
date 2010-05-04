@@ -39,6 +39,10 @@ int TM_init (master_node_t ** master_nodes,
              char * master_node,
              short port,
              int max_con_transfers);
+int slave_comm_active_io (buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state, void ** state);
+int slave_comm_idle_io (buffer_state_t * write_buffer_state, void ** state);
+int slave_comm_state_initiator (void ** state, void * arg);
+int slave_comm_state_liberator (void ** state);
 void * slave_comm_to_master (void * args);
 
 
