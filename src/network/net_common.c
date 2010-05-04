@@ -13,6 +13,7 @@
 #include "scar_log.h"
 
 #include <fcntl.h>
+#include <pthread.h>
 
 #define TRUE   1
 #define FALSE  0
@@ -23,6 +24,24 @@
 #define	PREFIX_V4_MAPPED		"::ffff:"
 
 
+
+int thread_sleep (int secs)
+{
+    pthread_mutex_t mutex;
+    pthread_cond_t cv;
+    struct timespec abstime = { 0, 0 };
+        
+    /* Init lock and conditional */
+    pthread_cond_init(&cv, NULL);
+    pthread_mutex_init(&mutex, NULL);
+    pthread_mutex_lock(&mutex);
+
+    /* Take the time of now, and add secs */
+    abstime.tv_sec = time(NULL) + secs;
+
+    /* Block, until time-out */
+    return pthread_cond_timedwait(&cv, &mutex, &abstime);
+}
 
 
 int select_and_wait_for_activity_loop (int          this_socket,

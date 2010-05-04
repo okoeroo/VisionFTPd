@@ -42,23 +42,9 @@ int TM_init (master_node_t ** master_nodes,
 void * slave_comm_to_master (void * args)
 {
     master_node_t * my_master = (master_node_t *) args;
-    pthread_mutex_t mutex;
-    pthread_cond_t cv;
-    struct timespec abstime = { 0, 0 };
-
 
     while (1)
     {
-        pthread_cond_init(&cv, NULL);
-        pthread_mutex_init(&mutex, NULL);
-        pthread_mutex_lock(&mutex);
-
-        abstime.tv_sec = time(NULL) + 5;
-        printf ("%d\n", (int) time(NULL));
-        pthread_cond_timedwait(&cv, &mutex, &abstime);
-        printf ("%d\n", (int) time(NULL));
-
-
         if (!my_master)
         {
             scar_log (1, "%s: Error: no Master Node object set\n", __func__);
@@ -80,6 +66,9 @@ void * slave_comm_to_master (void * args)
                          my_master -> master_node,
                          my_master -> port);
         }
+
+        /* Thread safe sleep */
+        thread_sleep(5);
     }
 
     return NULL;

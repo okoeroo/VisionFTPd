@@ -31,6 +31,8 @@ typedef enum NET_RC_CODES_e {
 } NET_RC_CODES;
 
 
+int thread_sleep (int sec);
+
 void createAndSetUpAllTCPServerSockets(int *nb_sockets, int *tb_sockets,
                                 int port, int max_connections);
 int createAndSetUpATCPServerSocket(int port, int max_connections);
