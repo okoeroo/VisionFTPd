@@ -139,8 +139,11 @@ void * slave_comm_to_master (void * args)
             rc = pthread_create(&(net_thread_pool_node -> threadid), NULL, threadingDaemonClientHandler, (void*)(&net_thread_pool_node));
             if (rc != 0)
             {
-                scar_log (1, "%s: Failed to spawn thread. To bad for this client.\n", __func__);
-                liberate_net_thread_pool_node (net_thread_pool_node, 1);
+                scar_log (1, "%s: Failed to spawn thread.\n", __func__);
+            }
+            else
+            {
+                pthread_join (net_thread_pool_node -> threadid, NULL);
             }
         }
 

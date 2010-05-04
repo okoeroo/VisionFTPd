@@ -86,7 +86,7 @@ void * threadingDaemonClientHandler (void * arg)
         /* scar_log (1, "--------------- foo! %s\n", ((ftp_state_t *) read_return_state) -> vfs_root -> name); */
     }
 
-    scar_log (1, "Acceptence of the client connection was Perfect! - %d - awaiting info\n", client_socket); 
+    scar_log (5, "Acceptence of the connection was Perfect! - %d - awaiting info\n", client_socket); 
     while (1)
     {
         FD_ZERO(&fdset);
@@ -114,7 +114,7 @@ void * threadingDaemonClientHandler (void * arg)
             if (read_buffer_state -> num_bytes <= 0)
             {
                 /* Maybe not... */
-                scar_log (1, "Connection closed by host \"%s\"\n", net_thread_pool_node -> net_thread_parameters.hostname);
+                scar_log (3, "Connection closed by host \"%s\"\n", net_thread_pool_node -> net_thread_parameters.hostname);
                 goto net_disconnect;
             }
             else
@@ -124,10 +124,10 @@ void * threadingDaemonClientHandler (void * arg)
                 /* If nothing is registered, then report the protocol info through the log facility */
                 if (net_thread_pool_node -> net_thread_parameters.net_thread_active_io_func == NULL)
                 {
-                    scar_log (1, "fd:%00d:%010d bytes: %s\n", client_socket, read_buffer_state -> num_bytes, read_buffer_state -> buffer);
+                    scar_log (5, "fd:%00d:%010d bytes: %s\n", client_socket, read_buffer_state -> num_bytes, read_buffer_state -> buffer);
                     if (u_strnstr (read_buffer_state -> buffer, (unsigned char *) "bye", strlen("bye")) != NULL)
                     {
-                        scar_log (1, "Connection closed by host \"%s\" due to nice wave good bye\n", net_thread_pool_node -> net_thread_parameters.hostname);
+                        scar_log (2, "Connection closed by host \"%s\" due to nice wave good bye\n", net_thread_pool_node -> net_thread_parameters.hostname);
                         goto net_disconnect;
                     }
                 }
@@ -149,7 +149,7 @@ void * threadingDaemonClientHandler (void * arg)
                         net_thread_state = (* net_thread_pool_node -> net_thread_parameters.net_thread_active_io_func)(read_buffer_state, write_buffer_state, &read_return_state);
                         if (net_thread_state == NET_RC_DISCONNECT)
                         {
-                            scar_log (1, "Connection with host \"%s\" closed.\n", net_thread_pool_node -> net_thread_parameters.hostname);
+                            scar_log (3, "Connection with host \"%s\" closed.\n", net_thread_pool_node -> net_thread_parameters.hostname);
                             goto net_disconnect;
                         }
                         else if (net_thread_state == NET_RC_MUST_WRITE)
@@ -157,7 +157,7 @@ void * threadingDaemonClientHandler (void * arg)
                             /* Writing - write until amount of commited bytes is equal to the number of bytes in the buffer */
                             while (write_buffer_state -> bytes_commited < write_buffer_state -> num_bytes)
                             {
-                                scar_log (1, "%d: >> %s", client_socket, write_buffer_state -> buffer);
+                                scar_log (2, "%d: >> %s", client_socket, write_buffer_state -> buffer);
                                 rc = write (client_socket, write_buffer_state -> buffer, write_buffer_state -> num_bytes);
                                 if (rc < 0)
                                 {
@@ -193,7 +193,7 @@ void * threadingDaemonClientHandler (void * arg)
                 net_thread_state = (* net_thread_pool_node -> net_thread_parameters.net_thread_idle_io_func)(write_buffer_state, &read_return_state);
                 if (net_thread_state == NET_RC_DISCONNECT)
                 {
-                    scar_log (1, "Connection with host \"%s\" closed.\n", net_thread_pool_node -> net_thread_parameters.hostname);
+                    scar_log (3, "Connection with host \"%s\" closed.\n", net_thread_pool_node -> net_thread_parameters.hostname);
                     goto net_disconnect;
                 }
                 else if (net_thread_state == NET_RC_MUST_WRITE)
@@ -201,7 +201,7 @@ void * threadingDaemonClientHandler (void * arg)
                     /* Writing - write until amount of commited bytes is equal to the number of bytes in the buffer */
                     while (write_buffer_state -> bytes_commited < write_buffer_state -> num_bytes)
                     {
-                        scar_log (1, "%d: >> %s", client_socket, write_buffer_state -> buffer);
+                        scar_log (2, "%d: >> %s", client_socket, write_buffer_state -> buffer);
                         rc = write (client_socket, write_buffer_state -> buffer, write_buffer_state -> num_bytes);
                         if (rc < 0)
                         {
@@ -225,11 +225,11 @@ void * threadingDaemonClientHandler (void * arg)
     }
 
 net_disconnect:
-    scar_log (1, "Shutting down %d...\n", client_socket);
+    scar_log (3, "Shutting down %d...\n", client_socket);
     shutdown (client_socket, SHUT_RDWR);
-    scar_log (1, "Closing %d...\n", client_socket);
+    scar_log (3, "Closing %d...\n", client_socket);
     close(client_socket);
-    scar_log (1, "Socket is done.\n", client_socket);
+    scar_log (3, "Socket is done.\n", client_socket);
 
     net_thread_pool_node -> net_thread_parameters.client_fd = -1;
 
