@@ -81,7 +81,13 @@ void * threadingDaemonClientHandler (void * arg)
     /* Initiate state handle */
     if (net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func != 0)
     {
-        (* net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func)(&read_return_state, net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg);
+        if ((* net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func)(&read_return_state, net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg) != 0)
+        {
+            scar_log (1, "%s: Unable to initialize state object. Assuming Out of memory! - Disconnecting client from \"%s\"",
+                            __func__, 
+                            net_thread_pool_node -> net_thread_parameters.hostname);
+            goto net_disconnect;
+        }
         /* Debug */
         /* scar_log (1, "--------------- foo! %s\n", ((ftp_state_t *) read_return_state) -> vfs_root -> name); */
     }

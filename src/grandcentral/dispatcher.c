@@ -26,17 +26,22 @@ Dispatcher
 
 int dispatcher_active_io (buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state, void ** state)
 {
-    ftp_state_t * ftp_state = *(ftp_state_t **)state;
-    int rc                  = 0;
+    dispatcher_state_t * dispatcher_state = *(dispatcher_state_t **)state;
+    int rc               = 0;
 
 
-    /* FTP connection state initialization */
-    if (ftp_state == NULL)
+    /* Dispatcher connection state initialization */
+    if (dispatcher_state == NULL)
     {
-        scar_log (1, "%s: Error: the ftp_state object was not yet created!\n", __func__);
+        scar_log (1, "%s: Error: the dispatcher_state object was not yet created!\n", __func__);
         rc = NET_RC_DISCONNECT;
         goto finalize_message_handling;
     }
+
+    /* Handle PASS message */
+    /* if ((rc = handle_ftp_PASS (ftp_state, read_buffer_state, write_buffer_state)) != NET_RC_UNHANDLED) */
+        /* goto finalize_message_handling; */
+
 
 #ifdef DEBUG
     scar_log (1, "   << %s\n", read_buffer_state -> buffer);
@@ -44,32 +49,79 @@ int dispatcher_active_io (buffer_state_t * read_buffer_state, buffer_state_t * w
 
 
 finalize_message_handling:
-    *state = (void *) ftp_state;
+    *state = (void *) dispatcher_state;
     return rc;
 }
 
 
 int dispatcher_idle_io (buffer_state_t * write_buffer_state, void ** state)
 {
-    ftp_state_t * ftp_state = *(ftp_state_t **)state;
-    int rc                  = NET_RC_IDLE;
-    net_msg_t * msg_to_send = NULL;
+    dispatcher_state_t * dispatcher_state = *(dispatcher_state_t **)state;
+    int rc               = NET_RC_IDLE;
 
+    /* Dispatcher connection state initialization */
+    if (dispatcher_state == NULL)
+    {
+        scar_log (1, "%s: Error: the dispatcher_state object was not yet created!\n", __func__);
+        rc = NET_RC_DISCONNECT;
+        goto finalize_message_handling;
+    }
+
+    if (dispatcher_state -> slave_init == 0)
+    {
+        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "Welcome to the VisionFTPd Dispatcher.\r\n Submit to me as my slave and provide the cluster secret.\r\nPassword: ");
+        dispatcher_state -> slave_init = 1;
+
+        if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+        {
+            /* Buffer overrun */
+            return NET_RC_DISCONNECT;
+        }
+        else
+        {
+            return NET_RC_MUST_WRITE;
+        }
+    }
 
 finalize_message_handling:
-    *state = (void *) ftp_state;
+    *state = (void *) dispatcher_state;
     return rc;
 }
 
 
-int dispatcher_state_liberator (void ** state)
+int dispatcher_state_initiator (void ** state, void * foo)
 {
+    dispatcher_state_t * dispatcher_state = NULL;
+
+    dispatcher_state = malloc (sizeof(dispatcher_state_t));
+
+    dispatcher_state -> slave_init   = 0;
+    dispatcher_state -> slave_online = 0;
+    dispatcher_state -> inbox_q  = net_msg_queue_create(); 
+    dispatcher_state -> outbox_q = net_msg_queue_create();
+
+    *state = dispatcher_state;
     return 0;
 }
 
-int dispatcher_state_initiator (void ** state, void * vfs)
+int dispatcher_state_liberator (void ** state)
 {
-    return 0;
+    dispatcher_state_t * dispatcher_state = *(dispatcher_state_t **)state;
+
+    if (dispatcher_state)
+    {
+        dispatcher_state -> slave_init   = 0;
+        dispatcher_state -> slave_online = 0;
+        net_msg_queue_delete (&(dispatcher_state -> inbox_q));
+        net_msg_queue_delete (&(dispatcher_state -> outbox_q));
+
+        free(dispatcher_state);
+
+        *state = NULL;
+        return 0;
+    }
+    else
+        return 1;
 }
 
 

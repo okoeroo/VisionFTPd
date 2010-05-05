@@ -8,6 +8,7 @@
 #include "ftpd.h"
 
 #include "net_threader.h"
+#include "net_messenger.h"
 #include "unsigned_string.h"
 
 #include "vfs.h"
@@ -20,6 +21,15 @@ typedef struct dispatcher_options_s {
     unsigned int   max_clients;
     vfs_t * vfs_root;
 } dispatcher_options_t;
+
+
+typedef struct dispatcher_state_s {
+    short slave_init;
+    short slave_online;
+    net_msg_queue_t * inbox_q;
+    net_msg_queue_t * outbox_q;
+} dispatcher_state_t;
+
 
 int dispatcher_active_io (buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state, void ** state);
 int dispatcher_idle_io   (buffer_state_t * write_buffer_state, void ** state);
