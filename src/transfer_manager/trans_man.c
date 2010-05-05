@@ -5,7 +5,8 @@ static int max_concurrent_transfers = 1;
 int TM_init (master_node_t ** master_nodes,
              char * master_node,
              short port,
-             int max_con_transfers)
+             int max_con_transfers,
+             char * password)
 {
     max_concurrent_transfers = max_con_transfers;
 
@@ -16,6 +17,8 @@ int TM_init (master_node_t ** master_nodes,
     this_master_node -> master_node = strdup(master_node);
     this_master_node -> port        = port;
     this_master_node -> socket      = -1;
+    this_master_node -> password    = password;
+
     this_master_node -> input_q     = NULL;
     this_master_node -> output_q    = NULL;
 
@@ -79,11 +82,35 @@ finalize_message_handling:
 
 int slave_comm_state_initiator (void ** state, void * arg)
 {
+    slave_comm_state_t * my_state = NULL;
+    if (!state)
+    {
+        scar_log (1, "%s: Error: couldn't initiate and back-register state object\n", __func__);
+        return 1;
+    }
+
+    my_state = malloc (sizeof (slave_comm_state_t));
+    if (!my_state)
+    {
+        scar_log (1, "%s: Error: couldn't initiate and back-register state object\n");
+        return 1;
+    }
+
+    my_state -> password = (char *) arg;
+
+    *state = my_state;
     return 0;
 }
 
 int slave_comm_state_liberator (void ** state)
 {
+    slave_comm_state_t * my_state = (slave_comm_state_t *) *state;
+
+    free(my_state -> password);
+    free(my_state);
+
+    *state = NULL;
+
     return 0;
 }
 
@@ -92,6 +119,7 @@ void * slave_comm_to_master (void * args)
 {
     master_node_t * my_master = (master_node_t *) args;
     net_thread_pool_t *         net_thread_pool_node  = NULL;
+    
     int rc = 0;
 
 
@@ -105,7 +133,10 @@ void * slave_comm_to_master (void * args)
     net_thread_pool_node -> net_thread_parameters.net_thread_active_io_func           = slave_comm_active_io;
     net_thread_pool_node -> net_thread_parameters.net_thread_idle_io_func             = slave_comm_idle_io;
     net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_func     = slave_comm_state_initiator;
-    net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg      = NULL;
+    if (my_master -> password)
+        net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg  = strdup(my_master -> password);
+    else
+        net_thread_pool_node -> net_thread_parameters.net_thread_state_initiator_arg  = NULL;
     net_thread_pool_node -> net_thread_parameters.net_thread_state_liberator_func     = slave_comm_state_liberator; 
 
     while (1)

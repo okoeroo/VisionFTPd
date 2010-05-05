@@ -211,7 +211,7 @@ int main (int argc, char * argv[])
     else
     {
         /* Initialize a master */
-        if (TM_init (&master_nodes, master_node_addr, master_node_port, 10) != 0)
+        if (TM_init (&master_nodes, master_node_addr, master_node_port, 10, password) != 0)
         {
             scar_log (1, "Failed to connect to VisionFTPd Master\n");
 

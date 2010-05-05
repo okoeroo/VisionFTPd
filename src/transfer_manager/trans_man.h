@@ -12,6 +12,7 @@ typedef struct master_node_s {
     char * master_node;
     short  port;
     int    socket;
+    char * password;
     net_msg_queue_t * input_q;
     net_msg_queue_t * output_q;
 
@@ -34,11 +35,16 @@ typedef struct data_transfers_s {
 } data_transfer_t;
 
 
+typedef struct slave_comm_state_s {
+    char * password;
+} slave_comm_state_t;
+
 
 int TM_init (master_node_t ** master_nodes,
              char * master_node,
              short port,
-             int max_con_transfers);
+             int max_con_transfers,
+             char * password);
 int slave_comm_active_io (buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state, void ** state);
 int slave_comm_idle_io (buffer_state_t * write_buffer_state, void ** state);
 int slave_comm_state_initiator (void ** state, void * arg);
