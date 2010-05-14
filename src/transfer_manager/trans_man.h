@@ -37,6 +37,7 @@ typedef struct data_transfers_s {
 
 typedef struct slave_comm_state_s {
     char * password;
+    int    initialized;
 } slave_comm_state_t;
 
 

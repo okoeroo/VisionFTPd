@@ -56,6 +56,7 @@ int threadingDaemonStart (const int listening_port,
 
 int liberate_net_thread_pool_node (net_thread_pool_t * net_thread_pool_node, int close_the_fd);
 
+int copy_buffer_to_buffer (buffer_state_t * src, buffer_state_t * dest);
 buffer_state_t * init_buffer_state (size_t buffer_size);
 int free_buffer_state (buffer_state_t ** buf);
 

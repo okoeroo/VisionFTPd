@@ -42,39 +42,71 @@ int TM_init (master_node_t ** master_nodes,
 }
 
 
+int slave_comm_PASS (slave_comm_state_t * state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state)
+{
+    write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "gimme_access_now\r\n");
+    if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
+    {
+        /* Buffer overrun */
+        return NET_RC_DISCONNECT;
+    }
+    else
+    {
+        return NET_RC_MUST_WRITE;
+    }
+}
+
 int slave_comm_active_io (buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state, void ** state)
 {
-    void * ftp_state = *(void **)state;
+    slave_comm_state_t * my_state = *(slave_comm_state_t **) state;
     int rc                  = 0;
 
 
-    /* FTP connection state initialization */
-    if (ftp_state == NULL)
+    if (my_state == NULL)
     {
-        scar_log (1, "%s: Error: the ftp_state object was not yet created!\n", __func__);
+        scar_log (1, "%s: Error: the slave_comm_state_t object was not yet created!\n", __func__);
         rc = NET_RC_DISCONNECT;
         goto finalize_message_handling;
     }
 
 #ifdef DEBUG
-    scar_log (1, "   << %s\n", read_buffer_state -> buffer);
+    scar_log (3, "   << %s\n", read_buffer_state -> buffer);
 #endif
+
+    if (!(my_state -> initialized))
+    {
+        /* Send password */
+        rc = slave_comm_PASS (my_state, read_buffer_state, write_buffer_state);
+        my_state -> initialized = 1;
+        scar_log (1, "\nSlave initialized\n");
+        goto finalize_message_handling;
+    }
 
 
 finalize_message_handling:
-    *state = (void *) ftp_state;
+#ifdef DEBUG
+    scar_log (3, "   >> %s\n", write_buffer_state -> buffer);
+#endif
+    *state = (void *) my_state;
     return rc;
 }
 
 
 int slave_comm_idle_io (buffer_state_t * write_buffer_state, void ** state)
 {
+    slave_comm_state_t * my_state = *(slave_comm_state_t **) state;
     void * ftp_state = *(void **)state;
     int rc                  = NET_RC_IDLE;
     net_msg_t * msg_to_send = NULL;
 
 
 finalize_message_handling:
+#ifdef DEBUG
+    if (write_buffer_state -> num_bytes)
+    {
+        scar_log (3, "   >> %s\n", write_buffer_state -> buffer);
+    }
+#endif
     *state = (void *) ftp_state;
     return rc;
 }

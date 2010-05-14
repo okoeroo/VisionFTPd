@@ -2,6 +2,30 @@
 /* #include "ftpd.h" */
 
 
+int copy_buffer_to_buffer (buffer_state_t * src, buffer_state_t * dest)
+{
+    if (!((dest && dest -> buffer) && (src && src -> buffer)))
+    {
+        return 1;
+    }
+
+    /* Check if the data would fit in the dest buffer */
+    if (src -> num_bytes > dest -> buffer_size)
+        return 1;
+
+    bcopy (src -> buffer, dest -> buffer, src -> num_bytes);
+    dest -> num_bytes      = src -> num_bytes;
+    dest -> offset         = src -> offset;
+    dest -> bytes_commited = src -> bytes_commited;
+    dest -> state          = src -> state;
+
+    /* String tolerance */
+    dest -> buffer[dest -> num_bytes] = '\0';
+
+    return 0;
+}
+
+
 buffer_state_t * init_buffer_state (size_t buffer_size)
 {
     buffer_state_t * buf = NULL;
