@@ -93,7 +93,7 @@ typedef struct surl_s {
 typedef enum vfs_node_e {
     VFS_DIRECTORY,
     VFS_REGULAR_FILE,
-    VFS_SYMLINK,
+    VFS_SYMLINK
 } vfs_node_t;
 
 

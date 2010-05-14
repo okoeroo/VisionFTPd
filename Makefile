@@ -8,6 +8,8 @@ UNAME = uname
 CFLAGS = \
    -g -DDEBUG \
    -Wall \
+   -ansi \
+   -pedantic \
     -Wcast-qual -Wchar-subscripts -Winline \
     -Wmissing-prototypes -Wnested-externs -Wpointer-arith \
     -Wredundant-decls -Wshadow -Wstrict-prototypes \
@@ -42,6 +44,7 @@ OBJS  = \
 	src/network/net_client.o \
 	src/network/net_server.o \
 	src/network/net_threader.o \
+	src/network/net_buffer.o \
 	src/network/net_messenger.o \
 	src/transfer_manager/trans_man.o \
 	src/unsigned_string.o \

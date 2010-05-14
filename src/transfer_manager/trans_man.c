@@ -10,8 +10,12 @@ int TM_init (master_node_t ** master_nodes,
 {
     max_concurrent_transfers = max_con_transfers;
 
-    master_node_t * this_master_node = NULL;
-    master_node_t * tmp_list         = NULL;
+    master_node_t * this_master_node;
+    master_node_t * tmp_list;
+
+    this_master_node = NULL;
+    tmp_list         = NULL;
+
 
     this_master_node = malloc (sizeof (master_node_t));
     this_master_node -> master_node = strdup(master_node);

@@ -2,6 +2,7 @@
     #define NET_THREADER
 
 #include "main.h"
+#include "net_buffer.h"
 #include "net_common.h"
 
 #include <errno.h>
@@ -12,15 +13,6 @@
 
 #include "unsigned_string.h"
 
-
-typedef struct buffer_state_s {
-    unsigned char * buffer;
-    size_t          buffer_size;
-    size_t          num_bytes;
-    size_t          offset;
-    size_t          bytes_commited;
-    int             state;
-} buffer_state_t;
 
 
 typedef struct net_threader_parameters_s {
@@ -56,8 +48,5 @@ int threadingDaemonStart (const int listening_port,
 
 int liberate_net_thread_pool_node (net_thread_pool_t * net_thread_pool_node, int close_the_fd);
 
-int copy_buffer_to_buffer (buffer_state_t * src, buffer_state_t * dest);
-buffer_state_t * init_buffer_state (size_t buffer_size);
-int free_buffer_state (buffer_state_t ** buf);
 
 #endif /* NET_THREADER */
