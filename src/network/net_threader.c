@@ -164,7 +164,6 @@ void * threadingDaemonClientHandler (void * arg)
                     /* Writing - write until amount of commited bytes is equal to the number of bytes in the buffer */
                     while (write_buffer_state -> bytes_commited < write_buffer_state -> num_bytes)
                     {
-                        scar_log (2, "%d: >> %s", client_socket, write_buffer_state -> buffer);
                         rc = write (client_socket, write_buffer_state -> buffer, write_buffer_state -> num_bytes);
                         if (rc < 0)
                         {

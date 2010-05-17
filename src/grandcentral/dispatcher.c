@@ -51,7 +51,7 @@ int dispatcher_active_io (buffer_state_t * read_buffer_state, buffer_state_t * w
     /* Push message to the inbox_q */
     if (read_buffer_state && (read_buffer_state -> num_bytes > 0))
     {
-        recv_msg = net_msg_create (read_buffer_state -> num_bytes);
+        recv_msg = net_msg_create (NULL, read_buffer_state -> num_bytes);
         if (!recv_msg)
         {
             scar_log (1, "%s: Error: Couldn't create a net_message object. Out of memory\n", __func__);
@@ -109,7 +109,7 @@ int dispatcher_idle_io (buffer_state_t * write_buffer_state, void ** state)
     /* Pop Outbox Q and push here */
     if (dispatcher_state -> outbox_q)
     {
-        send_msg = net_msg_pop_on_queue (dispatcher_state -> outbox_q);
+        send_msg = net_msg_pop_from_queue (dispatcher_state -> outbox_q);
         if (send_msg)
         {
             /* Returning 0 is ok, 1 is not ok */
@@ -126,7 +126,8 @@ int dispatcher_idle_io (buffer_state_t * write_buffer_state, void ** state)
             }
 
             /* Free popped msg */
-            net_msg_delete_list (&send_msg);
+            net_msg_delete_msg (send_msg);
+            send_msg = NULL;
         }
     }
 
@@ -167,8 +168,8 @@ int dispatcher_state_liberator (void ** state)
     {
         dispatcher_state -> slave_init   = 0;
         dispatcher_state -> slave_online = 0;
-        net_msg_queue_delete (&(dispatcher_state -> inbox_q));
-        net_msg_queue_delete (&(dispatcher_state -> outbox_q));
+        net_msg_queue_delete (dispatcher_state -> inbox_q);
+        net_msg_queue_delete (dispatcher_state -> outbox_q);
 
         free(dispatcher_state);
 

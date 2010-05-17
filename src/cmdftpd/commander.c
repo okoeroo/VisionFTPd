@@ -160,14 +160,15 @@ int commander_idle_io (buffer_state_t * write_buffer_state, void ** state)
 
 
     /* Handle message queue */
-    if ((msg_to_send = net_msg_pop_on_queue (ftp_state -> output_q)))
+    if ((msg_to_send = net_msg_pop_from_queue (ftp_state -> output_q)))
     {
         write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, 
                                                     write_buffer_state -> buffer_size,
                                                     "%s",
                                                     msg_to_send -> msg -> buffer);
         /* Remove popped message */
-        net_msg_delete_list (&msg_to_send);
+        net_msg_delete_msg (msg_to_send);
+        msg_to_send = NULL;
 
         /* Buffer overrun */ 
         if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)

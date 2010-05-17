@@ -41,6 +41,9 @@ typedef struct slave_comm_state_s {
 } slave_comm_state_t;
 
 
+int slave_comm_PASS (slave_comm_state_t * state, buffer_state_t * read_buffer_state, buffer_state_t * write_buffer_state);
+
+
 int TM_init (master_node_t ** master_nodes,
              char * master_node,
              short port,

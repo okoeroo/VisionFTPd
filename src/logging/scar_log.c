@@ -606,7 +606,7 @@ int scar_log_set_time_indicator (void)
     
     _time      = time(NULL);
     _time_s    = localtime(&_time);
-    _strf_size = strftime(_strf_fmt, MAX_TIME_STRING_SIZE, "%F.%T%z", _time_s);
+    _strf_size = strftime(_strf_fmt, MAX_TIME_STRING_SIZE, "%Y-%m-%d.%H:%M:%S%Z", _time_s);
 
     /* Free previous set extra_logstr */
     free(extra_logstr);

@@ -1,51 +1,77 @@
 #include "net_messenger.h"
 
 
-net_msg_t * net_msg_create (size_t buffer_size)
-{
-    net_msg_t * msg = malloc(sizeof(net_msg_t));
+net_msg_postoffice_t * central_postoffice = NULL;
 
-    if (msg)
+
+net_msg_t * net_msg_create (net_msg_mailbox_handle_t * handle, size_t buffer_size)
+{
+    net_msg_t * msg_container = malloc(sizeof(net_msg_t));
+
+    if (msg_container)
     {
-        msg -> src_sock = -1;
-        msg -> dst_sock = -1;
-        msg -> msg      = init_buffer_state (buffer_size);
-        msg -> next     = NULL;
+        if (handle)
+        {
+            msg_container -> author_id   = handle -> owner_id;
+            msg_container -> category_id = handle -> category_id;
+        }
+        else
+        {
+            msg_container -> author_id   = -1;
+            msg_container -> category_id = -1;
+        }
+        
+        pthread_mutex_init (&(msg_container -> lock), NULL);
+        msg_container -> lock_id     = msg_container -> author_id;
+        msg_container -> src         = msg_container -> author_id;
+        msg_container -> dst         = msg_container -> author_id;
+
+        msg_container -> msg         = init_buffer_state (buffer_size);
     }
-    return msg;
+    return msg_container;
 }
 
 
-net_msg_t * net_msg_pop_on_queue (net_msg_queue_t * q)
+
+net_msg_t * net_msg_pop_from_queue (net_msg_queue_t * q)
 {
     net_msg_t * popped = NULL;
 
-    if (q)
+    if (q && q -> list)
     {
-        pthread_mutex_lock (&(q -> lock));
-        if (q -> on_queue)
+        pthread_mutex_lock (&(q -> q_lock));
+        if (q -> list) 
         {
-            popped = q -> on_queue;
-            q -> on_queue = q -> on_queue -> next;
+            popped = q -> list;
+            q -> list = q -> list -> next;
             popped -> next = NULL;
         }
-        pthread_mutex_unlock (&(q -> lock));
+        pthread_mutex_unlock (&(q -> q_lock));
     }
 
     return popped;
 }
 
 
-int net_msg_push_on_queue (net_msg_queue_t * q, net_msg_t * pushed)
+
+int net_msg_push_to_queue (net_msg_queue_t * q, net_msg_t * pushed)
 {
     net_msg_t * helper = NULL;
 
     if (q && pushed)
     {
-        pthread_mutex_lock (&(q -> lock));
-        if (q -> on_queue)
+        /* Lock entire queue */
+        pthread_mutex_lock (&(q -> q_lock));
+        
+        /* Add message to the queue, when there was set yet */
+        if (!(q -> list))
         {
-            helper = q -> on_queue;
+            q -> list = pushed;
+        }
+        else
+        {
+            /* Attach pushed message to the end of the list */
+            helper = q -> list;
             while (helper)
             {
                 if (helper -> next == NULL)
@@ -57,36 +83,13 @@ int net_msg_push_on_queue (net_msg_queue_t * q, net_msg_t * pushed)
                 helper = helper -> next;
             }
         }
-        else
-        {
-            q -> on_queue = pushed;
-        }
-        pthread_mutex_unlock (&(q -> lock));
+
+        /* Unlock queue */
+        pthread_mutex_unlock (&(q -> q_lock));
         return 0;
     }
     else
         return 1;
-}
-
-int net_msg_delete_list (net_msg_t ** list)
-{
-    net_msg_t * del_list = NULL;
-
-    if (!list)
-        return 1;
-    else
-    {
-        del_list = *list;
-        while (del_list)
-        {
-            del_list -> src_sock = -1;
-            del_list -> dst_sock = -1;
-            free_buffer_state(&(del_list -> msg));
-            del_list = del_list -> next;
-        }
-        *list = del_list;
-        return 0;
-    }
 }
 
 
@@ -96,34 +99,231 @@ net_msg_queue_t * net_msg_queue_create (void)
 
     if (q)
     {
-        q -> in_process = NULL;
-        q -> on_queue   = NULL;
-        pthread_mutex_init (&(q -> lock), NULL);
+        q -> list = NULL;
+        pthread_mutex_init (&(q -> q_lock), NULL);
     }
 
     return q;
 }
 
 
-int net_msg_queue_delete (net_msg_queue_t ** q)
+
+int net_msg_delete_msg (net_msg_t * msg)
 {
-    net_msg_queue_t * del_q = NULL;
-
-    if (!q)
-        return 1;
-    else
+    if (msg)
     {
-        del_q = *q;
+        pthread_mutex_lock    (&(msg -> lock));
 
-        pthread_mutex_lock (&(del_q -> lock));
-        net_msg_delete_list (&(del_q -> in_process));
-        net_msg_delete_list (&(del_q -> on_queue));
+        free_buffer_state(&(msg -> msg));
 
-        pthread_mutex_unlock (&(del_q -> lock));
-        pthread_mutex_destroy (&(del_q -> lock));
-       
-        free(del_q);
-        *q = NULL;
+        msg -> author_id   = -1;
+        msg -> category_id = -1;
+        msg -> lock_id     = -1;
+        msg -> src         = -1;
+        msg -> dst         = -1;
+        msg -> msg         = NULL;
+
+        pthread_mutex_unlock  (&(msg -> lock));
+        pthread_mutex_destroy (&(msg -> lock));
+
+        free(msg);
     }
     return 0;
 }
+
+
+int net_msg_queue_clean (net_msg_queue_t * q)
+{
+    net_msg_t * msg = NULL;
+
+    if (q && q -> list)
+    {
+        /* Pop the queue */
+        while ((msg = net_msg_pop_from_queue(q)))
+        {
+            net_msg_delete_msg(msg);
+        }
+        /* Clean the list */
+        q -> list = NULL;
+    }
+    return 0;
+}
+
+int net_msg_queue_delete (net_msg_queue_t * q)
+{
+    if (!q)
+    {
+        return 1;
+    }
+    else
+    {
+        pthread_mutex_lock (&(q -> q_lock));
+
+        /* Clean all messages from the queue */
+        net_msg_queue_clean (q);
+
+        pthread_mutex_unlock (&(q -> q_lock));
+        pthread_mutex_destroy (&(q -> q_lock));
+       
+        free(q);
+    }
+    return 0;
+}
+
+
+net_msg_mailbox_handle_t * net_msg_mailbox_create_handle (int category_id)
+{
+    pid_t             tid;
+    struct timeval    tv;
+    net_msg_mailbox_handle_t * handle = NULL;
+
+    handle = malloc (sizeof(net_msg_mailbox_handle_t));
+    if (handle)
+    {
+        /* Create handle for mailbox */
+        tid = syscall(SYS_gettid);
+        gettimeofday(&tv, NULL);
+
+        handle -> owner_id = tid * (int)tv.tv_sec * (int)tv.tv_usec;
+    }
+
+    return handle;
+}
+
+
+int net_msg_mailbox_delete (net_msg_mailbox_t * mailbox)
+{
+    if (mailbox)
+    {
+        mailbox -> owner_id    = -1;
+        mailbox -> category_id = -1;
+        net_msg_queue_delete(mailbox -> inbox);
+        net_msg_queue_delete(mailbox -> outbox);
+
+        free(mailbox);
+    }
+    return 0;
+}
+
+
+net_msg_mailbox_handle_t * net_msg_mailbox_create (int category_id)
+{
+    net_msg_mailbox_handle_t * handle = NULL;
+    net_msg_mailbox_t *        mailbox = NULL;
+
+    if ((handle = net_msg_mailbox_create_handle (category_id)))
+    {
+        mailbox = malloc(sizeof(net_msg_mailbox_t));
+        if (!mailbox)
+        {
+            free(handle);
+            handle = NULL;
+            return NULL;
+        }
+        else
+        {
+            mailbox -> owner_id    = handle -> owner_id;
+            mailbox -> category_id = handle -> category_id;
+            mailbox -> inbox       = net_msg_queue_create();
+            mailbox -> outbox      = net_msg_queue_create();
+
+            /* If anything didn't went ok with this, clean up now */
+                /* Mailbox created, adding to Post Office object */
+            if (!(mailbox -> inbox) || 
+                (!(mailbox -> outbox)) ||
+                (net_msg_add_mailbox_to_postoffice (mailbox) != 0)
+                )
+            {
+                net_msg_mailbox_delete (mailbox);
+                mailbox = NULL;
+
+                free(handle);
+                handle = NULL;
+                return NULL;
+            }
+        }
+    }
+    return handle;
+}
+
+
+int net_msg_add_mailbox_to_postoffice (net_msg_mailbox_t * mailbox)
+{
+    net_msg_postoffice_t * cpo = NULL;
+
+    /* No central post office yet */
+    if (!central_postoffice)
+    {
+        central_postoffice = malloc (sizeof(net_msg_postoffice_t));
+        central_postoffice -> mailbox = mailbox;
+        central_postoffice -> next    = NULL;
+
+        return 0;
+    }
+    else
+    {
+        /* Find an empty spot */
+        cpo = central_postoffice;
+        while (cpo)
+        {
+            if (!cpo -> mailbox)
+            {
+                cpo -> mailbox = mailbox;
+                return 0;
+            }
+            cpo = cpo -> next;
+        }
+
+        /* Added mailbox at the end */
+        cpo = central_postoffice;
+        while (cpo -> next)
+        { 
+            cpo = cpo -> next;
+        }
+        cpo -> next = malloc (sizeof(net_msg_postoffice_t));
+        cpo -> next -> mailbox = mailbox; 
+        cpo -> next -> next    = NULL;
+
+        return 0;
+    }
+}
+
+
+int net_msg_clean_postoffice (void)
+{
+    net_msg_postoffice_t * cpo = NULL;
+
+    while (central_postoffice)
+    {
+        net_msg_mailbox_delete (central_postoffice -> mailbox);
+        cpo = central_postoffice;
+        central_postoffice = central_postoffice -> next;
+        free(cpo);
+    }
+    return 0;
+}
+
+
+net_msg_mailbox_t * net_msg_search_on_handle (net_msg_mailbox_handle_t * handle)
+{
+    net_msg_postoffice_t * cpo     = NULL;
+    /* net_msg_mailbox_t *    mailbox = NULL; */
+
+    if (!handle)
+        return NULL;
+
+    cpo = central_postoffice;
+    while (cpo)
+    {
+        if (cpo -> mailbox)
+        {
+            if (cpo -> mailbox -> owner_id == handle -> owner_id)
+            {
+                return cpo -> mailbox;
+            }
+        }
+        cpo = cpo -> next;
+    }
+    return 0;
+}
+

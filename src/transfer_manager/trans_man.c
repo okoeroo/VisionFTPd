@@ -8,13 +8,11 @@ int TM_init (master_node_t ** master_nodes,
              int max_con_transfers,
              char * password)
 {
+    master_node_t * this_master_node = NULL;
+    master_node_t * tmp_list = NULL;
+
+
     max_concurrent_transfers = max_con_transfers;
-
-    master_node_t * this_master_node;
-    master_node_t * tmp_list;
-
-    this_master_node = NULL;
-    tmp_list         = NULL;
 
 
     this_master_node = malloc (sizeof (master_node_t));
@@ -101,7 +99,7 @@ int slave_comm_idle_io (buffer_state_t * write_buffer_state, void ** state)
     slave_comm_state_t * my_state = *(slave_comm_state_t **) state;
     void * ftp_state = *(void **)state;
     int rc                  = NET_RC_IDLE;
-    net_msg_t * msg_to_send = NULL;
+    /* net_msg_t * msg_to_send = NULL; */
 
 
 finalize_message_handling:

@@ -1,12 +1,14 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "main.h"
 
 #include "unsigned_string.h"
 
 #include "ftpd.h"
+
 
 static char * ftp_service_banner = NULL;
 
@@ -136,7 +138,6 @@ int EPRT_to_host_port (unsigned char * str, char ** host_ip, unsigned short * po
     for (i = 0; (i < 6) && (tmp_str[0] != '\0') && (tmp_str[0] != '|'); i++)
     {
         tmp_port[i] = tmp_str;
-        tmp_str = &tmp_str[1];
     }
 
     scar_log (1, "%s: EPRT host: %s\n", __func__, *host_ip);
@@ -986,11 +987,11 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                     close (ftp_state -> data_channel -> data_sock);
                     ftp_state -> data_channel -> data_sock = -1;
 
-                    msg = net_msg_create (100);
+                    msg = net_msg_create (NULL, 100);
                     msg -> msg -> num_bytes = snprintf ((char *) msg -> msg -> buffer, 
                                                                  msg -> msg -> buffer_size,
                                                                  "226 transfer finished.\r\n");
-                    net_msg_push_on_queue (ftp_state -> output_q, msg);
+                    net_msg_push_to_queue (ftp_state -> output_q, msg);
                 }
 
                 /* Must free output */
