@@ -64,6 +64,13 @@
 /**************************************/
 
 
+typedef enum MAILBOX_CATEGORIES_e {
+    CAT_FTP_CLIENTS,
+    CAT_DISPATCHERS,
+    CAT_FTP_MOVERS
+} MAILBOX_CATEGORIES_T;
+
+
 
 void usage (void);
 

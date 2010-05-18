@@ -195,14 +195,18 @@ int net_msg_mailbox_delete (net_msg_mailbox_t * mailbox)
 {
     if (mailbox)
     {
-        mailbox -> owner_id    = -1;
         mailbox -> category_id = -1;
+        mailbox -> owner_id    = -1;
         net_msg_queue_delete(mailbox -> inbox);
         net_msg_queue_delete(mailbox -> outbox);
 
         free(mailbox);
+        return 0;
     }
-    return 0;
+    else
+    {
+        return 1;
+    }
 }
 
 
@@ -289,6 +293,36 @@ int net_msg_add_mailbox_to_postoffice (net_msg_mailbox_t * mailbox)
 }
 
 
+int net_msg_remove_mailbox (net_msg_mailbox_handle_t * handle)
+{
+    net_msg_postoffice_t * cpo     = NULL;
+    /* net_msg_mailbox_t *    mailbox = NULL; */
+
+    if (!handle)
+        return 1;
+
+    cpo = central_postoffice;
+    while (cpo)
+    {
+        if (cpo -> mailbox)
+        {
+            if (cpo -> mailbox -> owner_id == handle -> owner_id)
+            {
+                if (net_msg_mailbox_delete(cpo -> mailbox) == 0)
+                {
+                    cpo -> mailbox = NULL;
+                    return 0;
+                }
+                else
+                    return 1;
+            }
+        }
+        cpo = cpo -> next;
+    }
+    return 0;
+}
+
+
 int net_msg_clean_postoffice (void)
 {
     net_msg_postoffice_t * cpo = NULL;
@@ -296,6 +330,8 @@ int net_msg_clean_postoffice (void)
     while (central_postoffice)
     {
         net_msg_mailbox_delete (central_postoffice -> mailbox);
+        central_postoffice -> mailbox = NULL;
+
         cpo = central_postoffice;
         central_postoffice = central_postoffice -> next;
         free(cpo);
@@ -327,3 +363,46 @@ net_msg_mailbox_t * net_msg_search_on_handle (net_msg_mailbox_handle_t * handle)
     return 0;
 }
 
+
+net_msg_t * net_msg_pop_from_inbox (net_msg_mailbox_handle_t * handle)
+{
+    net_msg_mailbox_t * mailbox = NULL;
+
+    if (!handle)
+    {
+        return NULL;
+    }
+    else
+    {
+        if (!(mailbox = net_msg_search_on_handle (handle)))
+        {
+            return NULL;
+        }
+        else
+        {
+            return net_msg_pop_from_queue (mailbox -> inbox);
+        }
+    }
+}
+
+
+net_msg_t * net_msg_pop_from_outbox (net_msg_mailbox_handle_t * handle)
+{
+    net_msg_mailbox_t * mailbox = NULL;
+
+    if (!handle)
+    {
+        return NULL;
+    }
+    else
+    {
+        if (!(mailbox = net_msg_search_on_handle (handle)))
+        {
+            return NULL;
+        }
+        else
+        {
+            return net_msg_pop_from_queue (mailbox -> outbox);
+        }
+    }
+}

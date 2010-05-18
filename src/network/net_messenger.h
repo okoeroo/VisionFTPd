@@ -69,12 +69,17 @@ net_msg_queue_t * net_msg_queue_create (void);
 int net_msg_delete_msg (net_msg_t * msg);
 int net_msg_queue_clean (net_msg_queue_t * q);
 int net_msg_queue_delete (net_msg_queue_t * q);
+
 net_msg_mailbox_handle_t * net_msg_mailbox_create_handle (int category_id);
 int net_msg_mailbox_delete (net_msg_mailbox_t * mailbox);
+
 net_msg_mailbox_handle_t * net_msg_mailbox_create (int category_id);
 int net_msg_add_mailbox_to_postoffice (net_msg_mailbox_t * mailbox);
+int net_msg_remove_mailbox (net_msg_mailbox_handle_t * handle);
 int net_msg_clean_postoffice (void);
 
 net_msg_mailbox_t * net_msg_search_on_handle (net_msg_mailbox_handle_t * handle);
+net_msg_t * net_msg_pop_from_inbox (net_msg_mailbox_handle_t * handle);
+net_msg_t * net_msg_pop_from_outbox (net_msg_mailbox_handle_t * handle);
 
 #endif /* NET_MESSENGER_H */

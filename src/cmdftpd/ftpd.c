@@ -28,35 +28,6 @@ static char * ftp_service_banner = NULL;
 ****************************************************************************************************/
 
 
-ftp_data_channel_t * create_ftp_data_channel (int data_sock, unsigned char * data)
-{
-    ftp_data_channel_t * data_channel = NULL;
-
-    /* Default initializing should be with '-1' and 'NULL' */
-
-
-    data_channel = malloc (sizeof (ftp_data_channel_t));
-    if (data_channel ==  NULL)
-        return NULL;
-
-    data_channel -> data_sock = data_sock;
-    data_channel -> data      = data;
-    data_channel -> data_buf  = init_buffer_state (4096);
-    if (data_channel -> data_buf == NULL)
-    {
-        free(data_channel);
-        data_channel = NULL;
-    }
-
-    return data_channel;
-}
-
-
-
-void * startFTPCallbckThread (void * arg)
-{
-    return NULL;
-}
 
 
 void set_ftp_service_banner (char * banner)
@@ -646,19 +617,7 @@ int handle_ftp_SIZE (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             /* Move commited bytes to next command in the buffer (if there) */
             move_bytes_commited_to_next_command (read_buffer_state);
 
-            /* TODO: Single transfer support for the moment! */
-            if (ftp_state -> in_transfer)
-            {
-                free (ftp_state -> in_transfer -> path);
-            }
-            else
-            {
-                ftp_state -> in_transfer = malloc (sizeof (file_transfer_t));
-            }
-            ftp_state -> in_transfer -> path = strdup (path);
-            ftp_state -> in_transfer -> size = 1337;
-
-            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "213 %d\r\n", (int) ftp_state -> in_transfer -> size);
+            write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "213 1337\r\n");
             if (write_buffer_state -> num_bytes >= write_buffer_state -> buffer_size)
             {
                 /* Buffer overrun */
@@ -817,6 +776,8 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                 scar_log (5, "%s: Got PORT information: %s:%d\n", __func__, host, port);
                 write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200 PORT Command succesful\r\n");
 
+                /* TODO: Make Outbox message for a Data-Mover or VFS query */
+
 
                 /* Fire off a connection back to the Client on the given host and port info */
                 s = firstTCPSocketConnectingCorrectly (host, port);
@@ -826,22 +787,10 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
                 }
                 else
                 {
-                    ftp_state -> data_channel = create_ftp_data_channel(s, NULL);
-                    if (ftp_state -> data_channel == NULL)
-                    {
-                        /* Out of memory */
-                        scar_log (1, "%s: Error: Out of memory when creating Data Channel Object.\n", __func__);
-                        close (s);
-                        return NET_RC_MUST_WRITE;
-                    }
-                    else
-                    {
-                        scar_log (5, "%s: opened client socket to client. fd is %d\n", __func__, ftp_state -> data_channel -> data_sock);
+                    close (s);
 
-
-                        /* Signal FTP data transfer ready */
-                        /* write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s150 Ready for transfer\r\n", (char *) write_buffer_state -> buffer); */
-                    }
+                    /* Signal FTP data transfer ready */
+                    /* write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s150 Ready for transfer\r\n", (char *) write_buffer_state -> buffer); */
                 }
             }
             else
@@ -979,19 +928,21 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             {
                 /* Open data port to send bytes */
                 /* Start Data thread */
-                if ((ftp_state -> data_channel) && (ftp_state -> data_channel -> data_sock >= 0))
+                
+                /* TODO: Write LIST to Outbox */
+
                 {
                     /* HACK */
-                    write (ftp_state -> data_channel -> data_sock, output, strlen(output));
-                    shutdown (ftp_state -> data_channel -> data_sock, SHUT_RDWR);
-                    close (ftp_state -> data_channel -> data_sock);
-                    ftp_state -> data_channel -> data_sock = -1;
+
+                    /* write (ftp_state -> data_channel -> data_sock, output, strlen(output)); */
+                    /* shutdown (ftp_state -> data_channel -> data_sock, SHUT_RDWR); */
+                    /* close (ftp_state -> data_channel -> data_sock); */
 
                     msg = net_msg_create (NULL, 100);
                     msg -> msg -> num_bytes = snprintf ((char *) msg -> msg -> buffer, 
                                                                  msg -> msg -> buffer_size,
                                                                  "226 transfer finished.\r\n");
-                    net_msg_push_to_queue (ftp_state -> output_q, msg);
+                    /* net_msg_push_to_queue (ftp_state -> output_q, msg); */
                 }
 
                 /* Must free output */

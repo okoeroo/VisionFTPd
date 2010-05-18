@@ -160,12 +160,10 @@ int commander_idle_io (buffer_state_t * write_buffer_state, void ** state)
 
 
     /* Handle message queue */
-    if ((msg_to_send = net_msg_pop_from_queue (ftp_state -> output_q)))
+    if ((msg_to_send = net_msg_pop_from_inbox (ftp_state -> mailbox_handle)))
     {
-        write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, 
-                                                    write_buffer_state -> buffer_size,
-                                                    "%s",
-                                                    msg_to_send -> msg -> buffer);
+        copy_buffer_to_buffer (msg_to_send -> msg, write_buffer_state);
+
         /* Remove popped message */
         net_msg_delete_msg (msg_to_send);
         msg_to_send = NULL;
@@ -187,45 +185,6 @@ finalize_message_handling:
     return rc;
 }
 
-
-int commander_state_liberator (void ** state)
-{
-    ftp_state_t *     ftp_state  = *(ftp_state_t **)state;
-    file_transfer_t * helper     = NULL;
-    
-    if (ftp_state)
-    {
-        ftp_state -> init       = 0;
-        ftp_state -> mode       = ASCII;
-        free(ftp_state -> ftp_user);
-        ftp_state -> ftp_user   = NULL;
-        free(ftp_state -> ftp_passwd);
-        ftp_state -> ftp_passwd = NULL;
-        free(ftp_state -> cwd);
-        ftp_state -> cwd        = NULL;
-
-        net_msg_queue_delete (&(ftp_state -> input_q));
-        net_msg_queue_delete (&(ftp_state -> output_q));
-
-        while (ftp_state -> in_transfer)
-        {
-            ftp_state -> in_transfer -> size = 0;
-            free(ftp_state -> in_transfer -> path);
-            ftp_state -> in_transfer -> path = NULL;
-            ftp_state -> in_transfer -> data_address_family = '\0';
-            free(ftp_state -> in_transfer -> data_address);
-            ftp_state -> in_transfer -> data_address = NULL;
-            ftp_state -> in_transfer -> data_port = 0;
-
-            helper = ftp_state -> in_transfer;
-            ftp_state -> in_transfer = ftp_state -> in_transfer -> next;
-            free(helper);
-        }
-
-        ftp_state -> vfs_root = NULL;
-    }
-    return 0;
-}
 
 int commander_state_initiator (void ** state, void * vfs)
 {
@@ -249,6 +208,36 @@ int commander_state_initiator (void ** state, void * vfs)
     {
         ftp_state -> init       = 0;
         ftp_state -> mode       = ASCII;
+        ftp_state -> ftp_user   = NULL;
+        ftp_state -> ftp_passwd = NULL;
+        ftp_state -> cwd        = NULL;
+
+        ftp_state -> vfs_root    = (vfs_t *) vfs;
+
+        /* Create and keep mailbox handle for this thread - in the Category FTP Clients */
+        ftp_state -> mailbox_handle = net_msg_mailbox_create(CAT_FTP_CLIENTS);
+        if (!(ftp_state -> mailbox_handle))
+        {
+            free(ftp_state);
+            return 1;
+        }
+
+        /* DEBUG */
+        /* VFS_print (ftp_state -> vfs_root); */
+
+        *state = ftp_state;
+    }
+    return 0;
+}
+
+int commander_state_liberator (void ** state)
+{
+    ftp_state_t *     ftp_state  = *(ftp_state_t **)state;
+    
+    if (ftp_state)
+    {
+        ftp_state -> init       = 0;
+        ftp_state -> mode       = ASCII;
         free(ftp_state -> ftp_user);
         ftp_state -> ftp_user   = NULL;
         free(ftp_state -> ftp_passwd);
@@ -256,17 +245,9 @@ int commander_state_initiator (void ** state, void * vfs)
         free(ftp_state -> cwd);
         ftp_state -> cwd        = NULL;
 
-        ftp_state -> in_transfer = NULL;
+        net_msg_remove_mailbox (ftp_state -> mailbox_handle);
 
-        ftp_state -> vfs_root    = (vfs_t *) vfs;
-
-        ftp_state -> input_q  = net_msg_queue_create();
-        ftp_state -> output_q = net_msg_queue_create();
-
-        /* DEBUG */
-        /* VFS_print (ftp_state -> vfs_root); */
-
-        *state = ftp_state;
+        ftp_state -> vfs_root = NULL;
     }
     return 0;
 }

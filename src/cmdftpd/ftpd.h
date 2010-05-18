@@ -59,11 +59,8 @@ typedef struct ftp_state_s {
     unsigned char * cwd;
     vfs_t *         vfs_cwd;
 
-    net_msg_queue_t * input_q;
-    net_msg_queue_t * output_q;
+    net_msg_mailbox_handle_t * mailbox_handle;
 
-    ftp_data_channel_t * data_channel;
-    file_transfer_t *    in_transfer;
     vfs_t *vfs_root;
 } ftp_state_t;
 
