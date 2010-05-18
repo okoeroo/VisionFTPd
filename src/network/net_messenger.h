@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include "main.h"
 #include "net_buffer.h"
 
 
@@ -63,6 +64,10 @@ typedef struct net_msg_postoffice_s {
 
 
 net_msg_t * net_msg_create (net_msg_mailbox_handle_t * handle, size_t buffer_size);
+int net_msg_set_category_id (net_msg_t * msg, int category_id);
+int net_msg_set_src_id (net_msg_t * msg, int src_id);
+int net_msg_set_dst_id (net_msg_t * msg, int dst_id);
+
 net_msg_t * net_msg_pop_from_queue (net_msg_queue_t * q);
 int net_msg_push_to_queue (net_msg_queue_t * q, net_msg_t * pushed);
 net_msg_queue_t * net_msg_queue_create (void);
@@ -81,5 +86,9 @@ int net_msg_clean_postoffice (void);
 net_msg_mailbox_t * net_msg_search_on_handle (net_msg_mailbox_handle_t * handle);
 net_msg_t * net_msg_pop_from_inbox (net_msg_mailbox_handle_t * handle);
 net_msg_t * net_msg_pop_from_outbox (net_msg_mailbox_handle_t * handle);
+int net_msg_push_to_inbox (net_msg_mailbox_handle_t * handle, net_msg_t * pushed);
+int net_msg_push_to_outbox (net_msg_mailbox_handle_t * handle, net_msg_t * pushed);
+
+
 
 #endif /* NET_MESSENGER_H */

@@ -64,10 +64,15 @@
 /**************************************/
 
 
+#define MIN_CLIENTS 1024
+
+
 typedef enum MAILBOX_CATEGORIES_e {
-    CAT_FTP_CLIENTS,
-    CAT_DISPATCHERS,
-    CAT_FTP_MOVERS
+    CAT_UNDEFINED   = -1,
+    CAT_FTP_CLIENTS =  2,
+    CAT_DISPATCHERS =  3,
+    CAT_FTP_MOVERS  =  4,
+    CAT_VFS_CATALOG =  5
 } MAILBOX_CATEGORIES_T;
 
 

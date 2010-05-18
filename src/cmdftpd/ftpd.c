@@ -747,7 +747,7 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
     unsigned char *   bufp              = &(read_buffer_state -> buffer)[read_buffer_state -> bytes_commited];
     char *            host              = NULL;
     unsigned short    port              = 0;
-    int               s                 = -1;
+    net_msg_t *       msg               = NULL;
 
     if (strncasecmp ((char *) bufp, cmd_trigger, strlen (cmd_trigger)) != 0)
     {
@@ -774,23 +774,33 @@ int handle_ftp_PORT (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             if (host != NULL)
             {
                 scar_log (5, "%s: Got PORT information: %s:%d\n", __func__, host, port);
-                write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "200 PORT Command succesful\r\n");
 
-                /* TODO: Make Outbox message for a Data-Mover or VFS query */
-
-
-                /* Fire off a connection back to the Client on the given host and port info */
-                s = firstTCPSocketConnectingCorrectly (host, port);
-                if (s < 0)
+                /* Make Outbox message for a Data-Mover or VFS query */
+                msg = net_msg_create (ftp_state -> mailbox_handle, 100);
+                if (!msg)
                 {
-                    /* Failed to open data port */
+                    write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, 
+                                                                write_buffer_state -> buffer_size, 
+                                                                "500 PORT Failed due to other stuff\r\n");
                 }
                 else
                 {
-                    close (s);
+                    /* Fire off a connection back to the Client on the given host and port info */
+                    /* s = firstTCPSocketConnectingCorrectly (host, port); */
 
-                    /* Signal FTP data transfer ready */
-                    /* write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, write_buffer_state -> buffer_size, "%s150 Ready for transfer\r\n", (char *) write_buffer_state -> buffer); */
+                    /* Write message to open a port to the client - Active FTP */
+                    msg -> msg -> num_bytes = snprintf ((char *) msg -> msg -> buffer, 
+                                                        msg -> msg -> buffer_size, 
+                                                        "PORT %s:%d\r\n", 
+                                                        host, 
+                                                        port);
+                    /* Set undefined category, as you don't know what command will follow */
+                    net_msg_set_category_id (msg, CAT_UNDEFINED);
+    
+                    /* Directly respond to the client with an OK */
+                    write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, 
+                                                                write_buffer_state -> buffer_size, 
+                                                                "200 PORT Command succesful\r\n");
                 }
             }
             else
@@ -928,21 +938,21 @@ int handle_ftp_LIST (ftp_state_t * ftp_state, buffer_state_t * read_buffer_state
             {
                 /* Open data port to send bytes */
                 /* Start Data thread */
-                
-                /* TODO: Write LIST to Outbox */
-
+                msg = net_msg_create (ftp_state -> mailbox_handle, strlen (output));
+                if (!msg)
                 {
+                    write_buffer_state -> num_bytes = snprintf ((char *) write_buffer_state -> buffer, 
+                                                                write_buffer_state -> buffer_size, 
+                                                                "550 Directory is empty.\r\n");
+                }
+                else
+                {
+                    /* Pushing message to the outbox */
+                    net_msg_set_dst_id (msg, CAT_FTP_MOVERS);
+                    net_msg_push_to_outbox (ftp_state -> mailbox_handle, msg);
+
                     /* HACK */
-
-                    /* write (ftp_state -> data_channel -> data_sock, output, strlen(output)); */
-                    /* shutdown (ftp_state -> data_channel -> data_sock, SHUT_RDWR); */
-                    /* close (ftp_state -> data_channel -> data_sock); */
-
-                    msg = net_msg_create (NULL, 100);
-                    msg -> msg -> num_bytes = snprintf ((char *) msg -> msg -> buffer, 
-                                                                 msg -> msg -> buffer_size,
-                                                                 "226 transfer finished.\r\n");
-                    /* net_msg_push_to_queue (ftp_state -> output_q, msg); */
+                    /* msg -> msg -> num_bytes = snprintf ((char *) msg -> msg -> buffer, msg -> msg -> buffer_size, "226 transfer finished.\r\n"); */
                 }
 
                 /* Must free output */

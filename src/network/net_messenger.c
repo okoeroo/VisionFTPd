@@ -4,6 +4,48 @@
 net_msg_postoffice_t * central_postoffice = NULL;
 
 
+int net_msg_set_category_id (net_msg_t * msg, int category_id)
+{
+    if (!msg)
+    {
+        return 1;
+    }
+    else
+    {
+        msg -> category_id = category_id;
+        return 0;
+    }
+}
+
+
+int net_msg_set_src_id (net_msg_t * msg, int src_id)
+{
+    if (!msg)
+    {
+        return 1;
+    }
+    else
+    {
+        msg -> src = src_id;
+        return 0;
+    }
+}
+
+
+int net_msg_set_dst_id (net_msg_t * msg, int dst_id)
+{
+    if (!msg)
+    {
+        return 1;
+    }
+    else
+    {
+        msg -> dst = dst_id;
+        return 0;
+    }
+}
+
+
 net_msg_t * net_msg_create (net_msg_mailbox_handle_t * handle, size_t buffer_size)
 {
     net_msg_t * msg_container = malloc(sizeof(net_msg_t));
@@ -184,7 +226,7 @@ net_msg_mailbox_handle_t * net_msg_mailbox_create_handle (int category_id)
         tid = syscall(SYS_gettid);
         gettimeofday(&tv, NULL);
 
-        handle -> owner_id = tid * (int)tv.tv_sec * (int)tv.tv_usec;
+        handle -> owner_id = tid * (int)tv.tv_sec * (int)tv.tv_usec + MIN_CLIENTS;
     }
 
     return handle;
@@ -406,3 +448,47 @@ net_msg_t * net_msg_pop_from_outbox (net_msg_mailbox_handle_t * handle)
         }
     }
 }
+
+int net_msg_push_to_inbox (net_msg_mailbox_handle_t * handle, net_msg_t * pushed)
+{
+    net_msg_mailbox_t * mailbox = NULL;
+
+    if (!handle)
+    {
+        return 1;
+    }
+    else
+    {
+        if (!(mailbox = net_msg_search_on_handle (handle)))
+        {
+            return 1;
+        }
+        else
+        {
+            return net_msg_push_to_queue (mailbox -> outbox, pushed);
+        }
+    }
+}
+
+int net_msg_push_to_outbox (net_msg_mailbox_handle_t * handle, net_msg_t * pushed)
+{
+    net_msg_mailbox_t * mailbox = NULL;
+
+    if (!handle)
+    {
+        return 1;
+    }
+    else
+    {
+        if (!(mailbox = net_msg_search_on_handle (handle)))
+        {
+            return 1;
+        }
+        else
+        {
+            return net_msg_push_to_queue (mailbox -> outbox, pushed);
+        }
+    }
+}
+
+
